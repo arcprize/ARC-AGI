@@ -154,6 +154,7 @@ class Arcade:
             self._session.headers.update(self.headers)
 
         self._lock = threading.Lock()
+        self._cookie_lock = threading.Lock()
 
         if self.arc_api_key == "" or self.arc_api_key is None:
             if self.operation_mode != OperationMode.OFFLINE:
@@ -848,7 +849,8 @@ class Arcade:
                 recordings_dir=self.recordings_dir,
                 scorecard_manager=self.scorecard_manager,
                 renderer=final_renderer,
-                cookies=self._session.cookies,
+                master_cookie_jar=self._session.cookies,
+                cookie_lock=self._cookie_lock,
             )
             return wrapper
 
