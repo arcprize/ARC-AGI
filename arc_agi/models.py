@@ -1,9 +1,17 @@
 """Pydantic models for ARC-AGI-3 environments."""
 
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, model_validator
+
+
+class APIError(str, Enum):
+    VALIDATION_ERROR = "VALIDATION_ERROR"
+    GAME_NOT_AVAILABLE_ERROR = "GAME_NOT_AVAILABLE_ERROR"
+    SERVER_ERROR = "SERVER_ERROR"
+    GAME_NOT_STARTED_ERROR = "GAME_NOT_STARTED_ERROR"
 
 
 class EnvironmentInfo(BaseModel):

@@ -12,6 +12,7 @@ from typing import Any, Callable, Optional
 import requests
 from arcengine import FrameDataRaw
 from dotenv import load_dotenv
+from flask import Flask, Response
 from pydantic import ValidationError
 
 from .local_wrapper import LocalEnvironmentWrapper
@@ -154,6 +155,7 @@ class Arcade:
             self._session.headers.update(self.headers)
 
         self._lock = threading.Lock()
+        self._cookie_lock = threading.Lock()
 
         if self.arc_api_key == "" or self.arc_api_key is None:
             if self.operation_mode != OperationMode.OFFLINE:
@@ -162,6 +164,10 @@ class Arcade:
         # Fetch from API if not in offline mode
         if self.operation_mode != OperationMode.OFFLINE:
             self._fetch_from_api()
+
+        # Callback for when a scorecard is closed, defaults to None
+        # Set by listen_and_serve()
+        self.on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None
 
     def _parse_operation_mode_from_env(self) -> OperationMode:
         """Resolve operation mode from env: OPERATION_MODE, then OFFLINE_ONLY/ONLINE_ONLY."""
@@ -848,7 +854,8 @@ class Arcade:
                 recordings_dir=self.recordings_dir,
                 scorecard_manager=self.scorecard_manager,
                 renderer=final_renderer,
-                cookies=self._session.cookies,
+                master_cookie_jar=self._session.cookies,
+                cookie_lock=self._cookie_lock,
             )
             return wrapper
 
@@ -923,7 +930,33 @@ class Arcade:
             metadata_file = env_dir / "metadata.json"
             import json
 
+            # Get class_name from metadata or default to game_id
+            class_name = metadata.get("class_name")
+            if not class_name:
+                # Generate from game_id (first 4 chars, capitalize first letter)
+                class_name = game_id[0].upper() + game_id[1:] if game_id else "Game"
+
+            # Create EnvironmentInfo
+            env_info = EnvironmentInfo(
+                game_id=metadata.get(
+                    "game_id", f"{game_id}-{version}" if version else game_id
+                ),
+                title=metadata.get("title", game_id),
+                tags=metadata.get("tags", []),
+                baseline_actions=metadata.get("baseline_actions", []),
+                date_downloaded=date_downloaded,
+                class_name=class_name,
+            )
+            env_info.local_dir = str(env_dir)
+
             metadata_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+            # Check if game_class is already in the directory
+            game_class_file = env_dir / f"{class_name.lower()}.py"
+            if game_class_file.exists():
+                return self._create_wrapper(
+                    env_info, scorecard_id, save_recording, seed, render_mode, renderer
+                )
 
             # Download source code
             source_url = f"{self.arc_base_url}/api/games/{game_id}-{version}/source"
@@ -944,19 +977,6 @@ class Arcade:
             # Save source code
             source_file = env_dir / f"{class_name.lower()}.py"
             source_file.write_text(source_code, encoding="utf-8")
-
-            # Create EnvironmentInfo
-            env_info = EnvironmentInfo(
-                game_id=metadata.get(
-                    "game_id", f"{game_id}-{version}" if version else game_id
-                ),
-                title=metadata.get("title", game_id),
-                tags=metadata.get("tags", []),
-                baseline_actions=metadata.get("baseline_actions", []),
-                date_downloaded=date_downloaded,
-                class_name=class_name,
-            )
-            env_info.local_dir = str(env_dir)
 
             self.logger.info(
                 f"Successfully downloaded game {game_id} (version: {version}) to {env_dir}"
@@ -979,3 +999,42 @@ class Arcade:
                 exc_info=True,
             )
             return None
+
+    def listen_and_serve(
+        self,
+        host: str = "0.0.0.0",
+        port: int = 8001,
+        competition_mode: bool = False,
+        save_all_recordings: bool = False,
+        add_cookie: Optional[Callable[[Response, str], Response]] = None,
+        scorecard_timeout: Optional[int] = None,
+        on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None,
+        extra_api_routes: Optional[Callable[["Arcade", Flask], None]] = None,
+        renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Spin up a Flask server (blocking). Uses arc_agi.server.create_app()."""
+        from .server import create_app
+
+        app, api = create_app(
+            self,
+            save_all_recordings=save_all_recordings,
+            add_cookie=add_cookie,
+            on_scorecard_close=on_scorecard_close,
+            renderer=renderer,
+        )
+        app.debug = False
+        app.threaded = True  # False increases stability
+
+        if on_scorecard_close is not None:
+            self._on_scorecard_close = on_scorecard_close
+            cleaner = threading.Thread(target=api.scorecard_cleanup_loop, daemon=True)
+            cleaner.start()
+
+        if extra_api_routes is not None:
+            extra_api_routes(self, app)
+
+        if scorecard_timeout is not None:
+            self.scorecard_manager.set_idle_for(scorecard_timeout)
+
+        app.run(host=host, port=port, **kwargs)

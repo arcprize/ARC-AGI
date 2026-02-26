@@ -6,6 +6,7 @@ from .test_base import (
     TestARCAGI3EdgeCases,
     TestARCAGI3EnvironmentVariables,
 )
+from .test_listen_and_serve import TestListenAndServe
 from .test_local_wrapper import TestLocalEnvironmentWrapper
 from .test_models import TestEnvironmentInfo
 from .test_scorecard import (
@@ -24,4 +25,5 @@ __all__ = [
     "TestEnvironmentScore",
     "TestEnvironmentScorecard",
     "TestScorecard",
+    "TestListenAndServe",
 ]

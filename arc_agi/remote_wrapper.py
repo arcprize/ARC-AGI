@@ -2,7 +2,7 @@
 
 import json
 import logging
-from copy import deepcopy
+import threading
 from typing import Any, Callable, Optional
 
 import numpy as np
@@ -32,7 +32,8 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
         recordings_dir: str = "recordings",
         scorecard_manager: Optional[Any] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
-        cookies: requests.cookies.RequestsCookieJar = RequestsCookieJar(),
+        master_cookie_jar: Optional[RequestsCookieJar] = None,
+        cookie_lock: Optional[threading.Lock] = None,
     ) -> None:
         """Initialize the remote environment wrapper.
 
@@ -63,8 +64,12 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
             "Accept": "application/json",
         }
         self._session = requests.Session()
-        self._session.cookies = deepcopy(cookies)
         self._session.headers.update(self.headers)
+
+        self._master_cookie_jar = (
+            master_cookie_jar if master_cookie_jar is not None else RequestsCookieJar()
+        )
+        self._cookie_lock = cookie_lock if cookie_lock is not None else threading.Lock()
 
         self.reset()
 
@@ -87,9 +92,16 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
             if self._guid:
                 payload["guid"] = self._guid
 
+            with self._cookie_lock:
+                self._session.cookies.update(self._master_cookie_jar)  # type: ignore[no-untyped-call]
+
             response = self._session.post(
                 url, json=payload, headers=headers, timeout=10
             )
+
+            with self._cookie_lock:
+                self._master_cookie_jar.update(self._session.cookies)  # type: ignore[no-untyped-call]
+
             response.raise_for_status()
             response_data = response.json()
 
@@ -171,9 +183,16 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
             if reasoning:
                 payload["reasoning"] = json.dumps(reasoning)
 
+            with self._cookie_lock:
+                self._session.cookies.update(self._master_cookie_jar)  # type: ignore[no-untyped-call]
+
             response = self._session.post(
                 url, json=payload, headers=headers, timeout=10
             )
+
+            with self._cookie_lock:
+                self._master_cookie_jar.update(self._session.cookies)  # type: ignore[no-untyped-call]
+
             response.raise_for_status()
             response_data = response.json()
 

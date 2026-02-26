@@ -119,6 +119,21 @@ You can render games in two ways:
    env = arc.make("ls20", renderer=my_renderer)
    ```
 
+## Changelog
+## [0.9.2] - 2026-02-26
+
+### Added
+- `listen_and_serve` method, see [Documentation](#listen_and_serve)
+
+### Fixed
+- 404 Scorecard not found about 50% of the time when in `ONLINE` mode
+- Game source being downloaded even if local copy already exists
+
+## [0.9.1] - 2026-01-29
+
+Initial Release
+
+
 ## API Reference
 
 ### Arcade Class
@@ -252,6 +267,65 @@ Close a scorecard and return the final scorecard data.
 final_scorecard = arc.close_scorecard()
 if final_scorecard:
     print(f"Final score: {final_scorecard.score}")
+```
+
+##### `listen_and_serve`
+
+Start a blocking Flask server that exposes the REST API. Uses `arc_agi.server.create_app()` under the hood.  This conforms to the [Rest API](https://docs.arcprize.org/rest_overview) to allow local execution for interactions with languages other than Python or with this Toolkit running in `ONLINE` mode.
+
+**Parameters:**
+- `host` (`str`, optional): Bind address. Default `"0.0.0.0"` to accept connections from any interface.
+- `port` (`int`, optional): Port to listen on. Default `8001`.
+- `competition_mode` (`bool`, optional): If `True`, enable competition mode. Default `False`.
+- `save_all_recordings` (`bool`, optional): If `True`, save recordings for all runs. Default `False`.
+- `add_cookie` (`Callable[[Response, str], Response]`, optional): Callback to inject a cookie into API responses. Receives `(response, api_key)`; must return the modified response. Use for session stickiness (e.g. ALB app cookies).
+- `scorecard_timeout` (`int`, optional): Idle timeout in seconds before scorecards are auto-closed. If set, starts a background cleanup loop.
+- `on_scorecard_close` (`Callable[[EnvironmentScorecard], None]`, optional): Callback invoked when a scorecard is closed (manually or by timeout).
+- `extra_api_routes` (`Callable[[Arcade, Flask], None]`, optional): Callback to register custom routes. Receives `(arcade, app)`.
+- `renderer` (`Callable[[int, FrameDataRaw], None]`, optional): Callback invoked for each frame during gameplay. Receives `(step_index, frame_data)`. Use for logging, visualization, or custom display.
+- `**kwargs`: Passed through to `Flask.run()` (e.g. `debug=True`, `threaded=True`).
+
+**Example (basic):**
+```python
+arc = Arcade()
+arc.listen_and_serve(port=8001)
+```
+
+**Example (with `add_cookie` for session stickiness):**
+```python
+from flask import Response
+
+def add_session_cookie(resp: Response, api_key: str) -> Response:
+    resp.set_cookie("APPLICATION_COOKIE", api_key, path="/", httponly=True)
+    return resp
+
+arc.listen_and_serve(add_cookie=add_session_cookie)
+```
+
+**Example (with `on_scorecard_close`):**
+```python
+def on_close(scorecard):
+    print(f"Scorecard closed: {scorecard.score}")
+
+arc.listen_and_serve(on_scorecard_close=on_close)
+```
+
+**Example (with `extra_api_routes`):**
+```python
+def register_custom(arcade, app):
+    @app.route("/custom")
+    def custom():
+        return {"environments": len(arcade.available_environments)}
+
+arc.listen_and_serve(extra_api_routes=register_custom)
+```
+
+**Example (with `renderer` for logging):**
+```python
+def log_frame(step: int, frame_data):
+    print(f"Step {step}: state={frame_data.state}, levels_completed={frame_data.levels_completed}")
+
+arc.listen_and_serve(renderer=log_frame)
 ```
 
 ### EnvironmentWrapper Class

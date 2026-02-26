@@ -1,5 +1,6 @@
 """ARC-AGI package."""
 
+from .api import RestAPI
 from .base import Arcade, OperationMode
 from .local_wrapper import LocalEnvironmentWrapper
 from .models import EnvironmentInfo
@@ -23,4 +24,5 @@ __all__ = [
     "OperationMode",
     "RemoteEnvironmentWrapper",
     "ScorecardManager",
+    "RestAPI",
 ]
