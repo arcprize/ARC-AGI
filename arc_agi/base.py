@@ -12,6 +12,7 @@ from typing import Any, Callable, Optional
 import requests
 from arcengine import FrameDataRaw
 from dotenv import load_dotenv
+from flask import Flask, Response
 from pydantic import ValidationError
 
 from .local_wrapper import LocalEnvironmentWrapper
@@ -163,6 +164,10 @@ class Arcade:
         # Fetch from API if not in offline mode
         if self.operation_mode != OperationMode.OFFLINE:
             self._fetch_from_api()
+
+        # Callback for when a scorecard is closed, defaults to None
+        # Set by listen_and_serve()
+        self.on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None
 
     def _parse_operation_mode_from_env(self) -> OperationMode:
         """Resolve operation mode from env: OPERATION_MODE, then OFFLINE_ONLY/ONLINE_ONLY."""
@@ -981,3 +986,42 @@ class Arcade:
                 exc_info=True,
             )
             return None
+
+    def listen_and_serve(
+        self,
+        host: str = "0.0.0.0",
+        port: int = 8001,
+        competition_mode: bool = False,
+        save_all_recordings: bool = False,
+        add_cookie: Optional[Callable[[Response, str], Response]] = None,
+        scorecard_timeout: Optional[int] = None,
+        on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None,
+        extra_api_routes: Optional[Callable[["Arcade", Flask], None]] = None,
+        renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Spin up a Flask server (blocking). Uses arc_agi.server.create_app()."""
+        from .server import create_app
+
+        app, api = create_app(
+            self,
+            save_all_recordings=save_all_recordings,
+            add_cookie=add_cookie,
+            on_scorecard_close=on_scorecard_close,
+            renderer=renderer,
+        )
+        app.debug = False
+        app.threaded = True  # False increases stability
+
+        if on_scorecard_close is not None:
+            self._on_scorecard_close = on_scorecard_close
+            cleaner = threading.Thread(target=api.scorecard_cleanup_loop, daemon=True)
+            cleaner.start()
+
+        if extra_api_routes is not None:
+            extra_api_routes(self, app)
+
+        if scorecard_timeout is not None:
+            self.scorecard_manager.set_idle_for(scorecard_timeout)
+
+        app.run(host=host, port=port, **kwargs)

@@ -749,19 +749,23 @@ class ScorecardManager:
     scorecards: dict[str, Scorecard]
     guids: dict[str, str]
     games: list[str]
+    idle_for: timedelta
 
     def __init__(self, games: list[str] = []) -> None:
         self.scorecards = {}
         self.guids = {}
         self.games = games
+        self.idle_for = timedelta(minutes=STALE_MINUTES)
+
+    def set_idle_for(self, idle_for: int) -> None:
+        self.idle_for = timedelta(minutes=idle_for)
 
     def get_stale_cards(self) -> List[str]:
-        idle_for = timedelta(minutes=STALE_MINUTES)
         now = datetime.now(timezone.utc)
         stale_ids = [
             cid
             for cid, sc in self.scorecards.items()
-            if now - sc.last_update >= idle_for
+            if now - sc.last_update >= self.idle_for
         ]
         return stale_ids
 

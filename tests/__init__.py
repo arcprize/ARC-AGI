@@ -8,6 +8,7 @@ from .test_base import (
 )
 from .test_local_wrapper import TestLocalEnvironmentWrapper
 from .test_models import TestEnvironmentInfo
+from .test_listen_and_serve import TestListenAndServe
 from .test_scorecard import (
     TestEnvironmentScore,
     TestEnvironmentScorecard,
@@ -24,4 +25,5 @@ __all__ = [
     "TestEnvironmentScore",
     "TestEnvironmentScorecard",
     "TestScorecard",
+    "TestListenAndServe",
 ]
