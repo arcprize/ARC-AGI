@@ -930,7 +930,33 @@ class Arcade:
             metadata_file = env_dir / "metadata.json"
             import json
 
+            # Get class_name from metadata or default to game_id
+            class_name = metadata.get("class_name")
+            if not class_name:
+                # Generate from game_id (first 4 chars, capitalize first letter)
+                class_name = game_id[0].upper() + game_id[1:] if game_id else "Game"
+
+            # Create EnvironmentInfo
+            env_info = EnvironmentInfo(
+                game_id=metadata.get(
+                    "game_id", f"{game_id}-{version}" if version else game_id
+                ),
+                title=metadata.get("title", game_id),
+                tags=metadata.get("tags", []),
+                baseline_actions=metadata.get("baseline_actions", []),
+                date_downloaded=date_downloaded,
+                class_name=class_name,
+            )
+            env_info.local_dir = str(env_dir)
+
             metadata_file.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+            # Check if game_class is already in the directory
+            game_class_file = env_dir / f"{class_name.lower()}.py"
+            if game_class_file.exists():
+                return self._create_wrapper(
+                    env_info, scorecard_id, save_recording, seed, render_mode, renderer
+                )
 
             # Download source code
             source_url = f"{self.arc_base_url}/api/games/{game_id}-{version}/source"
@@ -951,19 +977,6 @@ class Arcade:
             # Save source code
             source_file = env_dir / f"{class_name.lower()}.py"
             source_file.write_text(source_code, encoding="utf-8")
-
-            # Create EnvironmentInfo
-            env_info = EnvironmentInfo(
-                game_id=metadata.get(
-                    "game_id", f"{game_id}-{version}" if version else game_id
-                ),
-                title=metadata.get("title", game_id),
-                tags=metadata.get("tags", []),
-                baseline_actions=metadata.get("baseline_actions", []),
-                date_downloaded=date_downloaded,
-                class_name=class_name,
-            )
-            env_info.local_dir = str(env_dir)
 
             self.logger.info(
                 f"Successfully downloaded game {game_id} (version: {version}) to {env_dir}"
