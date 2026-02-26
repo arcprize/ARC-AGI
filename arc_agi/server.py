@@ -1,5 +1,3 @@
-"""Flask server stub for ARC-AGI-New."""
-
 from typing import Callable, Optional, Tuple
 
 from arcengine import FrameDataRaw, GameAction
