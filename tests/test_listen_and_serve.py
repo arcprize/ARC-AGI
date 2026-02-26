@@ -56,7 +56,9 @@ class TestListenAndServe(unittest.TestCase):
             os.environ.pop(var, None)
         os.environ["ARC_API_KEY"] = "test-key-123"
 
-    def test_offline_server_online_client_four_action3_levels_completed_one(self) -> None:
+    def test_offline_server_online_client_four_action3_levels_completed_one(
+        self,
+    ) -> None:
         """Spin up Arcade in offline mode with test_environment_files, serve backend,
         then use online client to play bt11: four ACTION3 steps yield levels_completed=1."""
         if not Path(self.environments_dir).exists():

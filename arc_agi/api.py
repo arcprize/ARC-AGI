@@ -2,17 +2,19 @@ import json
 import threading
 import time
 import uuid
-from arcengine import ActionInput, FrameData, FrameDataRaw, GameAction
-from pydantic import ValidationError
 from typing import Any, Callable, Optional, Tuple
+
+from arcengine import ActionInput, FrameData, FrameDataRaw, GameAction
 from flask import Response, jsonify, request
+from pydantic import ValidationError
 
 from .base import Arcade
-from .wrapper import EnvironmentWrapper
-from .scorecard import EnvironmentScorecard, ScorecardManager
 from .models import APIError
+from .scorecard import EnvironmentScorecard
+from .wrapper import EnvironmentWrapper
 
-MAX_OPAQUE_BYTES = 16 * 1024 # 16KiB (16384 bytes)
+MAX_OPAQUE_BYTES = 16 * 1024  # 16KiB (16384 bytes)
+
 
 class RestAPI:
     def __init__(
@@ -45,7 +47,6 @@ class RestAPI:
             resp = self.add_cookie(resp, api_key)
         return resp
 
-
     def get_games(self) -> Tuple[Response, int]:
         out = [e.model_dump(mode="json") for e in self.arcade.available_environments]
         return jsonify(out), 200
@@ -66,7 +67,9 @@ class RestAPI:
     ) -> Tuple[Response, int]:
         api_key = request.headers.get("X-API-Key", "1234")
         scorecard = (
-            self.arcade.scorecard_manager.get_scorecard(card_id, api_key) if card_id else None
+            self.arcade.scorecard_manager.get_scorecard(card_id, api_key)
+            if card_id
+            else None
         )
         if scorecard is None:
             return jsonify(
@@ -96,7 +99,6 @@ class RestAPI:
                 out.model_dump(exclude_none=True),
                 api_key=api_key,
             ), 200
-
 
     def new_scorecard(self) -> Tuple[Response, int]:
         data = request.get_json()
@@ -133,7 +135,6 @@ class RestAPI:
             api_key=api_key,
         ), 200
 
-
     def close_scorecard(self) -> Tuple[Response, int]:
         data = request.get_json()
         if not isinstance(data, dict) or "card_id" not in data:
@@ -145,7 +146,9 @@ class RestAPI:
             ), 400
 
         api_key = request.headers.get("X-API-Key", "1234")
-        scorecard, guids, _ = self.arcade.scorecard_manager.close_scorecard(data["card_id"], api_key)
+        scorecard, guids, _ = self.arcade.scorecard_manager.close_scorecard(
+            data["card_id"], api_key
+        )
         if scorecard is None:
             return jsonify(
                 {
@@ -207,7 +210,12 @@ class RestAPI:
         api_key = request.headers.get("X-API-Key", "1234")
         game_id = data["game_id"]
 
-        game, full_reset = self._get_or_create_environment(game_id=game_id, scorecard_id=data.get("card_id", None), guid=data.get("guid", None), api_key=api_key)
+        game, full_reset = self._get_or_create_environment(
+            game_id=game_id,
+            scorecard_id=data.get("card_id", None),
+            guid=data.get("guid", None),
+            api_key=api_key,
+        )
 
         if game:
             if game.api_key != api_key:  # type: ignore[attr-defined]
@@ -240,7 +248,15 @@ class RestAPI:
                     reasoning=data.get("reasoning"),
                 )
                 # Only send the action if not a full reset (brand new game)
-                response = g.step(action=input_action.id, data=input_action.data, reasoning=input_action.reasoning) if not full_reset else g.observation_space
+                response = (
+                    g.step(
+                        action=input_action.id,
+                        data=input_action.data,
+                        reasoning=input_action.reasoning,
+                    )
+                    if not full_reset
+                    else g.observation_space
+                )
                 if response is None:
                     return jsonify(
                         {
@@ -293,8 +309,8 @@ class RestAPI:
             }
         ), 400
 
-    def _get_or_create_environment(self, 
-        game_id: str, scorecard_id: str | None, guid: str | None, api_key: str
+    def _get_or_create_environment(
+        self, game_id: str, scorecard_id: str | None, guid: str | None, api_key: str
     ) -> tuple[EnvironmentWrapper | None, bool]:
         with self._cache_lock:
             game: Optional[EnvironmentWrapper] = None
@@ -303,17 +319,24 @@ class RestAPI:
                 game = self._environmentCache.get(guid)
                 if game and game.environment_info.game_id == game_id:
                     return game, False
-            
+
             if not scorecard_id:
                 return None, False
 
-            game = self.arcade.make(game_id, scorecard_id=scorecard_id, save_recording=self.save_all_recordings, renderer=self.renderer)
+            game = self.arcade.make(
+                game_id,
+                scorecard_id=scorecard_id,
+                save_recording=self.save_all_recordings,
+                renderer=self.renderer,
+            )
             if game is None:
                 return None, False
             setattr(game, "api_key", api_key)
             return game, True
 
-    def _save_to_environment_cache(self, environment: EnvironmentWrapper, guid: str) -> None:
+    def _save_to_environment_cache(
+        self, environment: EnvironmentWrapper, guid: str
+    ) -> None:
         with self._cache_lock:
             self._environmentCache[guid] = environment
 
@@ -326,7 +349,9 @@ class RestAPI:
                 self.arcade.logger.info(
                     f"[auto-close] scorecard {cid} idle > {self.arcade.scorecard_manager.idle_for.total_seconds() / 60} min"
                 )
-                scorecard, guids, _ = self.arcade.scorecard_manager.close_scorecard(cid, None)
+                scorecard, guids, _ = self.arcade.scorecard_manager.close_scorecard(
+                    cid, None
+                )
                 if scorecard is not None:
                     if self.arcade._on_scorecard_close is not None:
                         envScorecard = EnvironmentScorecard.from_scorecard(
@@ -337,8 +362,7 @@ class RestAPI:
                         for guid in guids:
                             self.cleanup_environment(guid)
 
-
-    def cleanup_environment(self,guid: str) -> None:
+    def cleanup_environment(self, guid: str) -> None:
         with self._cache_lock:
             if guid in self._environmentCache:
                 del self._environmentCache[guid]

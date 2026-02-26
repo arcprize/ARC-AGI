@@ -1,28 +1,31 @@
 """Flask server stub for ARC-AGI-New."""
 
-from arcengine import GameAction, FrameDataRaw
-from flask import Flask
-from .base import Arcade
 from typing import Callable, Optional, Tuple
-from flask import Response
+
+from arcengine import FrameDataRaw, GameAction
+from flask import Flask, Response
+
 from .api import RestAPI
+from .base import Arcade
 from .scorecard import EnvironmentScorecard
 
+
 def create_app(
-        arcade: Arcade,
-        competition_mode: bool = False,
-        save_all_recordings: bool = False,
-        add_cookie: Optional[Callable[[Response, str], Response]] = None,
-        on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None,
-        renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
-    ) -> Tuple[Flask, RestAPI]:
+    arcade: Arcade,
+    competition_mode: bool = False,
+    save_all_recordings: bool = False,
+    add_cookie: Optional[Callable[[Response, str], Response]] = None,
+    on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None,
+    renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
+) -> Tuple[Flask, RestAPI]:
     """Create and configure the Flask application."""
     app = Flask(__name__)
     api = RestAPI(
         arcade=arcade,
         competition_mode=competition_mode,
         save_all_recordings=save_all_recordings,
-        add_cookie=add_cookie, on_scorecard_close=on_scorecard_close,
+        add_cookie=add_cookie,
+        on_scorecard_close=on_scorecard_close,
         renderer=renderer,
     )
 
@@ -33,13 +36,13 @@ def create_app(
         "/api/games",
         methods=["GET"],
         view_func=lambda: api.get_games(),
-        endpoint="games"
+        endpoint="games",
     )
     app.add_url_rule(
         "/api/games/<game_id>",
         methods=["GET"],
         view_func=lambda game_id: api.get_game_info(game_id=game_id),
-        endpoint="game_by_id"
+        endpoint="game_by_id",
     )
 
     app.add_url_rule(
@@ -63,7 +66,9 @@ def create_app(
     app.add_url_rule(
         "/api/scorecard/<card_id>/<game_id>",
         methods=["GET"],
-        view_func=lambda card_id, game_id: api.get_scorecard(card_id=card_id, game_id=game_id),
+        view_func=lambda card_id, game_id: api.get_scorecard(
+            card_id=card_id, game_id=game_id
+        ),
         endpoint="scorecard_with_gameid",
     )
 
