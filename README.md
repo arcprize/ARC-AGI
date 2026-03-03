@@ -1,4 +1,4 @@
-# ARG-AGI
+# ARC-AGI
 
 ARC-AGI Toolkit is an open-sourced python interface (API) for ARC-AGI-3 interactive environments. It provides a consistent API and tooling layer that lets agents interact with ARC-AGI-3 environments, locally or via API.
 
