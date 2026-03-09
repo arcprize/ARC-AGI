@@ -193,7 +193,9 @@ class TestEnvironmentScore(unittest.TestCase):
         calculator = EnvironmentScoreCalculator(id="test-id", resets=0)
 
         # Baseline: 10 actions, taken: 5 actions -> score = (10/5) * 100 = 200, capped at 100
-        calculator.add_level(completed=True, actions_taken=5, baseline_actions=10)
+        calculator.add_level(
+            level_index=1, completed=True, actions_taken=5, baseline_actions=10
+        )
         self.assertEqual(calculator.levels_completed, 1)
         self.assertEqual(calculator.actions, 5)
         self.assertEqual(len(calculator.level_scores), 1)
@@ -204,7 +206,9 @@ class TestEnvironmentScore(unittest.TestCase):
         calculator = EnvironmentScoreCalculator(id="test-id", resets=0)
 
         # Baseline: 10 actions, taken: 10 actions -> score = (10/10) * 100 = 100
-        calculator.add_level(completed=True, actions_taken=10, baseline_actions=10)
+        calculator.add_level(
+            level_index=1, completed=True, actions_taken=10, baseline_actions=10
+        )
         self.assertEqual(calculator.levels_completed, 1)
         self.assertEqual(calculator.actions, 10)
         self.assertEqual(calculator.level_scores[0], 100.0)
@@ -214,7 +218,9 @@ class TestEnvironmentScore(unittest.TestCase):
         calculator = EnvironmentScoreCalculator(id="test-id", resets=0)
 
         # Baseline: 10 actions, taken: 8 actions -> score = (10/8) * 100 = 125, capped at 100
-        calculator.add_level(completed=True, actions_taken=8, baseline_actions=10)
+        calculator.add_level(
+            level_index=1, completed=True, actions_taken=8, baseline_actions=10
+        )
         self.assertEqual(calculator.level_scores[0], 100.0)  # Capped at 100
 
     def test_add_level_completed_above_baseline(self):
@@ -222,14 +228,18 @@ class TestEnvironmentScore(unittest.TestCase):
         calculator = EnvironmentScoreCalculator(id="test-id", resets=0)
 
         # Baseline: 10 actions, taken: 20 actions -> score = (10/20) * 100 = 50
-        calculator.add_level(completed=True, actions_taken=20, baseline_actions=10)
-        self.assertEqual(calculator.level_scores[0], 50.0)
+        calculator.add_level(
+            level_index=1, completed=True, actions_taken=20, baseline_actions=10
+        )
+        self.assertEqual(calculator.level_scores[0], 25.0)
 
     def test_add_level_not_completed(self):
         """Test add_level with completed=False appends 0."""
         calculator = EnvironmentScoreCalculator(id="test-id", resets=0)
 
-        calculator.add_level(completed=False, actions_taken=15, baseline_actions=10)
+        calculator.add_level(
+            level_index=1, completed=False, actions_taken=15, baseline_actions=10
+        )
         self.assertEqual(calculator.levels_completed, 0)  # Not incremented
         self.assertEqual(calculator.actions, 15)  # Still added to total
         self.assertEqual(len(calculator.level_scores), 1)
@@ -239,7 +249,9 @@ class TestEnvironmentScore(unittest.TestCase):
         """Test add_level with zero actions_taken."""
         calculator = EnvironmentScoreCalculator(id="test-id", resets=0)
 
-        calculator.add_level(completed=True, actions_taken=0, baseline_actions=10)
+        calculator.add_level(
+            level_index=1, completed=True, actions_taken=0, baseline_actions=10
+        )
         self.assertEqual(calculator.levels_completed, 1)
         self.assertEqual(calculator.actions, 0)
         self.assertEqual(
@@ -251,19 +263,25 @@ class TestEnvironmentScore(unittest.TestCase):
         calculator = EnvironmentScoreCalculator(id="test-id", resets=0)
 
         # Level 1: completed with 8 actions (baseline 10) -> score = 125, capped at 100
-        calculator.add_level(completed=True, actions_taken=8, baseline_actions=10)
+        calculator.add_level(
+            level_index=1, completed=True, actions_taken=8, baseline_actions=10
+        )
 
         # Level 2: completed with 12 actions (baseline 10) -> score = (10/12) * 100 = 83.33...
-        calculator.add_level(completed=True, actions_taken=12, baseline_actions=10)
+        calculator.add_level(
+            level_index=2, completed=True, actions_taken=12, baseline_actions=10
+        )
 
         # Level 3: not completed
-        calculator.add_level(completed=False, actions_taken=5, baseline_actions=10)
+        calculator.add_level(
+            level_index=3, completed=False, actions_taken=5, baseline_actions=10
+        )
 
         self.assertEqual(calculator.levels_completed, 2)
         self.assertEqual(calculator.actions, 25)  # 8 + 12 + 5
         self.assertEqual(len(calculator.level_scores), 3)
         self.assertEqual(calculator.level_scores[0], 100.0)
-        self.assertAlmostEqual(calculator.level_scores[1], 83.33333333333333, places=5)
+        self.assertAlmostEqual(calculator.level_scores[1], 69.44444444444444, places=5)
         self.assertEqual(calculator.level_scores[2], 0.0)
 
     def test_to_score_average(self):
@@ -271,13 +289,13 @@ class TestEnvironmentScore(unittest.TestCase):
         calculator = EnvironmentScoreCalculator(id="test-id", resets=2)
 
         calculator.add_level(
-            completed=True, actions_taken=10, baseline_actions=10
+            level_index=1, completed=True, actions_taken=10, baseline_actions=10
         )  # score = 100
         calculator.add_level(
-            completed=True, actions_taken=20, baseline_actions=10
+            level_index=2, completed=True, actions_taken=20, baseline_actions=10
         )  # score = 50
         calculator.add_level(
-            completed=False, actions_taken=5, baseline_actions=10
+            level_index=3, completed=False, actions_taken=5, baseline_actions=10
         )  # score = 0
         calculator.completed = True  # Set completed flag
 
@@ -288,8 +306,8 @@ class TestEnvironmentScore(unittest.TestCase):
         self.assertEqual(score.completed, True)
         self.assertEqual(score.levels_completed, 2)
         self.assertEqual(score.actions, 35)  # 10 + 20 + 5
-        # Average: (100 + 50 + 0) / 3 = 50.0
-        self.assertAlmostEqual(score.score, 50.0, places=5)
+        # Average: (100 + 25*2 + 0*3) / (1+2+3) = 50.0
+        self.assertAlmostEqual(score.score, 25.0, places=5)
 
     def test_to_score_empty_levels(self):
         """Test to_score with no levels added."""
@@ -307,12 +325,14 @@ class TestEnvironmentScore(unittest.TestCase):
         """Test to_score with single level."""
         calculator = EnvironmentScoreCalculator(id="test-id", resets=1)
 
-        calculator.add_level(completed=True, actions_taken=15, baseline_actions=10)
+        calculator.add_level(
+            level_index=1, completed=True, actions_taken=15, baseline_actions=10
+        )
         calculator.completed = False  # Set completed flag
 
         score = calculator.to_score()
         self.assertEqual(
-            score.score, (10 / 15) * 100
+            score.score, ((10 / 15) ** 2) * 100
         )  # Should be exact value, not average of one
         self.assertEqual(score.levels_completed, 1)
         self.assertEqual(score.actions, 15)
@@ -383,6 +403,58 @@ class TestEnvironmentScorecard(unittest.TestCase):
         # Score should be (10/10) * 100 = 100
         self.assertAlmostEqual(scorecard_result.environments[0].score, 100.0, places=5)
         self.assertEqual(scorecard_result.score, 100.0)  # Average of one score
+
+    def test_from_scorecard_with_level_tags(self):
+        """Test basic EnvironmentScorecard creation."""
+        from arc_agi.scorecard import Card, Scorecard
+
+        # Create a simple scorecard with one game
+        card = Card(
+            game_id="bt11",
+            total_plays=1,
+            guids=["guid1"],
+            levels_completed=[5],
+            actions=[50],
+            resets=[0],
+            states=[GameState.WIN],
+            actions_by_level=[[(1, 10), (2, 20), (3, 30), (4, 40), (5, 45)]],
+        )
+
+        scorecard = Scorecard(
+            card_id="test-card",
+            api_key="test-key",
+            cards={"bt11": card},
+        )
+
+        env_info = EnvironmentInfo(
+            game_id="bt11",
+            title="BT11",
+            baseline_actions=[10, 5, 5, 5, 5],
+            tags=["test"],
+            level_tags=[[], ["new_mechanic"], [], ["new_mechanic"], ["new_mechanic"]],
+        )
+
+        scorecard_result = EnvironmentScorecard.from_scorecard(
+            scorecard, [env_info], do_private_tags=True
+        )
+
+        print(scorecard_result.tags_scores)
+
+        # Score should be (10/10) * 100 = 100
+        self.assertAlmostEqual(scorecard_result.environments[0].score, 55.0, places=5)
+        self.assertAlmostEqual(scorecard_result.score, 55.0)  # Average of one score
+
+        tags_by_id = {s.id: s for s in scorecard_result.tags_scores}
+
+        # Check that shared tag has aggregated scores from both games
+        if "private_new_mechanic" in tags_by_id:
+            tag_score = tags_by_id["private_new_mechanic"]
+            # Should have 2 levels completed (one from each game)
+            self.assertEqual(tag_score.levels_completed, 3)
+            # new_mechanic score should be (25*2 + 25*4 + 100*5) / 11
+            self.assertAlmostEqual(tag_score.score, 59.09090909, places=5)
+        else:
+            self.fail("private_new_mechanic tag not found")
 
     def test_from_scorecard_highest_levels_completed(self):
         """Test that only the play with highest levels_completed is used."""
@@ -598,6 +670,8 @@ class TestEnvironmentScorecard(unittest.TestCase):
             title="BT11",
             baseline_actions=[10],
             tags=["tag1", "shared"],  # Has shared tag
+            private_tags=["secret"],
+            level_tags=[["new_mechanic"]],
         )
 
         env_info2 = EnvironmentInfo(
@@ -605,10 +679,11 @@ class TestEnvironmentScorecard(unittest.TestCase):
             title="AM92",
             baseline_actions=[15],
             tags=["tag2", "shared"],  # Also has shared tag
+            private_tags=["secret"],
         )
 
         scorecard_result = EnvironmentScorecard.from_scorecard(
-            scorecard, [env_info1, env_info2]
+            scorecard, [env_info1, env_info2], do_private_tags=True
         )
 
         # Should have tag scores for tag1, tag2, and shared
@@ -621,19 +696,33 @@ class TestEnvironmentScorecard(unittest.TestCase):
             # Should have 2 levels completed (one from each game)
             self.assertEqual(shared_score.levels_completed, 2)
             # Score should be average of both: bt11 (10/10)*100=100, am92 (15/15)*100=100, avg=100
-            self.assertAlmostEqual(shared_score.score, 55.0, places=5)
+            self.assertAlmostEqual(shared_score.score, 30.5, places=5)
+        else:
+            self.fail("shared tag not found")
         if "tag1" in tags_by_id:
             shared_score = tags_by_id["tag1"]
             # Should have 2 levels completed (one from each game)
             self.assertEqual(shared_score.levels_completed, 1)
             # Score should be average of both: bt11 (10/10)*100=100, am92 (15/15)*100=100, avg=100
-            self.assertAlmostEqual(shared_score.score, 50.0, places=5)
+            self.assertAlmostEqual(shared_score.score, 25.0, places=5)
+        else:
+            self.fail("tag1 tag not found")
         if "tag2" in tags_by_id:
             shared_score = tags_by_id["tag2"]
             # Should have 2 levels completed (one from each game)
             self.assertEqual(shared_score.levels_completed, 1)
             # Score should be average of both: bt11 (10/10)*100=100, am92 (15/15)*100=100, avg=100
-            self.assertAlmostEqual(shared_score.score, 60.0, places=5)
+            self.assertAlmostEqual(shared_score.score, 36.0, places=5)
+        else:
+            self.fail("tag2 tag not found")
+        if "private_secret" in tags_by_id:
+            shared_score = tags_by_id["private_secret"]
+            # Should have 2 levels completed (one from each game)
+            self.assertEqual(shared_score.levels_completed, 2)
+            # Score should be average of both: bt11 (10/10)*100=100, am92 (15/15)*100=100, avg=100
+            self.assertAlmostEqual(shared_score.score, 30.5, places=5)
+        else:
+            self.fail("private_secret tag not found")
 
     def test_not_completed_games(self):
         """Test that tags_scores are computed correctly."""
@@ -694,24 +783,21 @@ class TestEnvironmentScorecard(unittest.TestCase):
             shared_score = tags_by_id["shared"]
             # Should have 2 levels completed (one from each game)
             self.assertEqual(shared_score.levels_completed, 2)
-            # Score should be average of both: bt11 (10/10)*100=100, am92 (15/15)*100=100, avg=100
-            self.assertAlmostEqual(shared_score.score, 22.0, places=5)
+            self.assertAlmostEqual(shared_score.score, 6.7777777, places=5)
             self.assertEqual(shared_score.number_of_levels, 5)
             self.assertEqual(shared_score.number_of_environments, 2)
         if "tag1" in tags_by_id:
             shared_score = tags_by_id["tag1"]
             # Should have 2 levels completed (one from each game)
             self.assertEqual(shared_score.levels_completed, 1)
-            # Score should be average of both: bt11 (10/10)*100=100, am92 (15/15)*100=100, avg=100
-            self.assertAlmostEqual(shared_score.score, 25.0, places=5)
+            self.assertAlmostEqual(shared_score.score, 8.33333333334, places=5)
             self.assertEqual(shared_score.number_of_levels, 2)
             self.assertEqual(shared_score.number_of_environments, 1)
         if "tag2" in tags_by_id:
             shared_score = tags_by_id["tag2"]
             # Should have 2 levels completed (one from each game)
             self.assertEqual(shared_score.levels_completed, 1)
-            # Score should be average of both: bt11 (10/10)*100=100, am92 (15/15)*100=100, avg=100
-            self.assertAlmostEqual(shared_score.score, 20.0, places=5)
+            self.assertAlmostEqual(shared_score.score, 6.0, places=5)
             self.assertEqual(shared_score.number_of_levels, 3)
             self.assertEqual(shared_score.number_of_environments, 1)
 
@@ -763,10 +849,10 @@ class TestEnvironmentScorecard(unittest.TestCase):
             scorecard, [env_info1, env_info2]
         )
 
-        # bt11: (10/20) * 100 = 50
+        # bt11: (10/20)**2 * 100 = 20
         # am92: (10/10) * 100 = 100
-        # Average: (50 + 100) / 2 = 75
-        self.assertAlmostEqual(scorecard_result.score, 75.0, places=5)
+        # Average: (25 + 100) / 2 = 75
+        self.assertAlmostEqual(scorecard_result.score, 62.5, places=5)
 
     def test_from_scorecard_empty_scorecard(self):
         """Test EnvironmentScorecard with empty scorecard."""
@@ -885,8 +971,6 @@ class TestEnvironmentScorecard(unittest.TestCase):
 
         scorecard_result = EnvironmentScorecard.from_scorecard(scorecard, [env_info])
 
-        print(scorecard_result.model_dump_json())
-
         # Should only have one environment score (for guid2)
         self.assertEqual(len(scorecard_result.environments), 1)
         self.assertEqual(scorecard_result.environments[0].id, "bt11-fd9df0622a1a")
@@ -899,7 +983,7 @@ class TestEnvironmentScorecard(unittest.TestCase):
             game_score = envs_by_id["bt11-fd9df0622a1a"]
             # Should have 2 levels completed (one from each game)
             self.assertEqual(game_score.levels_completed, 2)
-            self.assertAlmostEqual(game_score.score, 40.0, places=5)
+            self.assertAlmostEqual(game_score.score, 20.0, places=5)
             self.assertEqual(game_score.actions, 118)
             self.assertEqual(game_score.resets, 6)
             self.assertEqual(game_score.completed, False)

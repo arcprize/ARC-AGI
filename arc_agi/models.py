@@ -25,6 +25,8 @@ class EnvironmentInfo(BaseModel):
     title: Optional[str] = None
     default_fps: Optional[int] = None
     tags: Optional[list[str]] = None
+    private_tags: Optional[list[str]] = None
+    level_tags: Optional[list[list[str]]] = None
     baseline_actions: Optional[list[int]] = None
     date_downloaded: Optional[datetime] = None
     class_name: Optional[str] = None

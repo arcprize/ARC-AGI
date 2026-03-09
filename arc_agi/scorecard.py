@@ -90,6 +90,7 @@ class EnvironmentScoreCalculator:
         self.id = id
         self.guid = guid
         self.resets = resets
+        self.level_indices: list[int] = []
         self.level_scores: list[float] = []
         self.levels_completed: int = 0
         self.actions: int = 0
@@ -101,6 +102,7 @@ class EnvironmentScoreCalculator:
 
     def add_level(
         self,
+        level_index: int,
         completed: bool,
         actions_taken: int,
         baseline_actions: int,
@@ -120,17 +122,19 @@ class EnvironmentScoreCalculator:
 
         if completed:
             self.levels_completed += 1
-            # Calculate score as ((baseline_actions / actions_taken) * 100) max 100
+            # Calculate score as ((baseline_actions / actions_taken)^2 * 100) max 100
             if actions_taken > 0:
-                score = (baseline_actions / actions_taken) * 100
+                score = ((baseline_actions / actions_taken) ** 2) * 100
                 score = min(score, 100.0)  # Cap at 100
             else:
                 score = 0.0
+            self.level_indices.append(level_index)
             self.level_scores.append(score)
             self.level_actions.append(actions_taken)
             self.level_baseline_actions.append(baseline_actions)
         else:
             # Not completed, append 0
+            self.level_indices.append(level_index)
             self.level_scores.append(0.0)
             self.level_actions.append(actions_taken)
             self.level_baseline_actions.append(baseline_actions)
@@ -143,7 +147,14 @@ class EnvironmentScoreCalculator:
         """
         # Calculate average of level_scores
         if len(self.level_scores) > 0:
-            score = sum(self.level_scores) / len(self.level_scores)
+            total_score = 0.0
+            total_weights = 0
+            for i in range(len(self.level_scores)):
+                weight = self.level_indices[i]
+                total_score += self.level_scores[i] * weight
+                total_weights += weight
+            # Calculate average of level_scores
+            score = total_score / total_weights
         else:
             score = 0.0
 
@@ -232,6 +243,7 @@ class EnvironmentScorecard(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
         exclude=True,
     )
+    competition_mode: Optional[bool] = False
 
     def get(self, game_id: Optional[str] = None) -> dict[str, Any]:
         if game_id is not None:
@@ -270,6 +282,12 @@ class EnvironmentScorecard(BaseModel):
         """Return the total number of resets."""
         return sum(env.actions for env in self.environments)
 
+    def find_environment(self, id_prefix: str) -> Optional[EnvironmentScoreList]:
+        for environment in self.environments:
+            if environment.id.startswith(id_prefix):
+                return environment
+        return None
+
     def model_dump_json(self, *, exclude_none: bool = True, **kwargs: Any) -> str:
         """Serialize to JSON string, excluding None fields by default.
 
@@ -294,7 +312,6 @@ class EnvironmentScorecard(BaseModel):
         actions: list[int] = []
         scores: list[float] = []
         baseline_actions: list[int] = []
-        print(f"actions_by_level: {actions_by_level}")
         for level_idx in range(len(actions_by_level)):
             actions_at_level = actions_by_level[level_idx]
             level_actions = actions_at_level[1] - prev_actions
@@ -318,6 +335,7 @@ class EnvironmentScorecard(BaseModel):
         idx: int,
         env_info: EnvironmentInfo | None,
         tags_scores: dict[str, EnvironmentScoreCalculator] | None,
+        do_private_tags: bool = False,
     ) -> EnvironmentScore:
         """Calculate the score for a single card."""
         levels_completed = card.levels_completed[idx]
@@ -417,22 +435,55 @@ class EnvironmentScorecard(BaseModel):
                     level_actions = card.actions[idx] - prev_actions
                     prev_actions = card.actions[idx]
                 calculator.add_level(
+                    level_index=level_idx + 1,
                     completed=level_completed,
                     actions_taken=level_actions,
                     baseline_actions=baseline,
                 )
-                if tags_scores is not None and env_info.tags:
-                    for tag in env_info.tags:
-                        tag_score = tags_scores.get(tag)
-                        if not tag_score:
-                            tag_score = EnvironmentScoreCalculator(id=tag)
-                            tags_scores[tag] = tag_score
-                        tag_score.add_level(
-                            completed=level_completed,
-                            actions_taken=level_actions,
-                            baseline_actions=baseline,
-                            game_id=game_id,
-                        )
+                if tags_scores is not None:
+                    if env_info.tags:
+                        for tag in env_info.tags:
+                            tag_score = tags_scores.get(tag)
+                            if not tag_score:
+                                tag_score = EnvironmentScoreCalculator(id=tag)
+                                tags_scores[tag] = tag_score
+                            tag_score.add_level(
+                                level_index=level_idx + 1,
+                                completed=level_completed,
+                                actions_taken=level_actions,
+                                baseline_actions=baseline,
+                                game_id=game_id,
+                            )
+                    if do_private_tags:
+                        if env_info.private_tags is not None:
+                            for tag in env_info.private_tags:
+                                tag = f"private_{tag}"
+                                tag_score = tags_scores.get(tag)
+                                if not tag_score:
+                                    tag_score = EnvironmentScoreCalculator(id=tag)
+                                    tags_scores[tag] = tag_score
+                                tag_score.add_level(
+                                    level_index=level_idx + 1,
+                                    completed=level_completed,
+                                    actions_taken=level_actions,
+                                    baseline_actions=baseline,
+                                    game_id=game_id,
+                                )
+                        if env_info.level_tags and level_idx < len(env_info.level_tags):
+                            level_tags = env_info.level_tags[level_idx]
+                            for tag in level_tags:
+                                tag = f"private_{tag}"
+                                tag_score = tags_scores.get(tag)
+                                if not tag_score:
+                                    tag_score = EnvironmentScoreCalculator(id=tag)
+                                    tags_scores[tag] = tag_score
+                                tag_score.add_level(
+                                    level_index=level_idx + 1,
+                                    completed=level_completed,
+                                    actions_taken=level_actions,
+                                    baseline_actions=baseline,
+                                    game_id=game_id,
+                                )
 
             return calculator.to_score()
 
@@ -441,6 +492,7 @@ class EnvironmentScorecard(BaseModel):
         cls,
         scorecard: "Scorecard",
         environment_infos: List[EnvironmentInfo],
+        do_private_tags: bool = False,
     ) -> "EnvironmentScorecard":
         """Create EnvironmentScorecard from Scorecard and EnvironmentInfos.
 
@@ -480,11 +532,21 @@ class EnvironmentScorecard(BaseModel):
             for idx, levels_completed in enumerate(card.levels_completed):
                 if idx == best_idx:
                     score = cls._calculate_score(
-                        card, game_id, best_idx, env_info_map.get(game_id), tags_scores
+                        card,
+                        game_id,
+                        best_idx,
+                        env_info_map.get(game_id),
+                        tags_scores,
+                        do_private_tags,
                     )
                 else:
                     score = cls._calculate_score(
-                        card, game_id, idx, env_info_map.get(game_id), None
+                        card,
+                        game_id,
+                        idx,
+                        env_info_map.get(game_id),
+                        None,
+                        do_private_tags,
                     )
                 all_scores.append(score)
 
@@ -517,6 +579,7 @@ class EnvironmentScorecard(BaseModel):
             tags_scores=tags_list,
             open_at=scorecard.open_at,
             last_update=scorecard.last_update,
+            competition_mode=scorecard.competition_mode,
         )
 
 
@@ -641,6 +704,7 @@ class Scorecard(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc),
         exclude=True,
     )
+    competition_mode: Optional[bool] = False
 
     def model_post_init(self, __context: Any) -> None:
         if not self.cards:
@@ -712,6 +776,12 @@ class Scorecard(BaseModel):
             "cards": {game_id: card.model_dump()} if card else {},
         }
 
+    def has_environment(self, game_id: str) -> bool:
+        for key, _ in self.cards.items():
+            if key.startswith(game_id):
+                return True
+        return False
+
     def update_scorecard(
         self, guid: str, data: FrameDataRaw, full_reset: bool
     ) -> GameState:
@@ -775,6 +845,7 @@ class ScorecardManager:
         tags: Optional[list[str]],
         api_key: str,
         opaque: Any | None,
+        competition_mode: bool | None = None,
     ) -> str:
         card_id = str(uuid.uuid4())
         self.scorecards[card_id] = Scorecard.model_validate(
@@ -785,6 +856,7 @@ class ScorecardManager:
                 "card_id": card_id,
                 "api_key": api_key,
                 "opaque": opaque,
+                "competition_mode": competition_mode,
             }
         )
         return card_id

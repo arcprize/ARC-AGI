@@ -2,6 +2,8 @@
     "game_id": "bt11-fd9df0622a1a",
     "title": "BT11",
     "tags": ["tag1", "tag2"],
+    "private_tags": ["private_tag1", "private_tag2"],
+    "level_tags": [["level_tag1"], ["level_tag2"], ["level_tag3"], ["level_tag4"], ["level_tag5"]],
     "baseline_actions": [4, 8, 16, 20, 24],
     "date_downloaded": "2024-01-20T12:00:00Z"
 }

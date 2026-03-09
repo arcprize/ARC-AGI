@@ -120,6 +120,17 @@ You can render games in two ways:
    ```
 
 ## Changelog
+## [0.9.3] - 2026-03-09
+
+### Added
+- `OperationMode.COMPETITION` method, see [Documentation](#competition-mode)
+- Official Scoring
+  - Average for an individual games is now weighted by the level index (1 indxed)
+  - Score for an individual level is now squared.  A score of `0.5` now becomes `0.25`
+
+### Fixed
+- Continued fixes for 404 Scorecard not found
+
 ## [0.9.2] - 2026-02-26
 
 ### Added
@@ -148,7 +159,7 @@ The `Arcade` constructor accepts the following parameters. All parameters can be
 |-----------|------|---------|---------------------|-------------|
 | `arc_api_key` | `str` | `""` | `ARC_API_KEY` | API key for ARC API. If empty and not in offline mode, an anonymous key will be automatically fetched. |
 | `arc_base_url` | `str` | `"https://three.arcprize.org"` | `ARC_BASE_URL` | Base URL for the ARC API. |
-| `operation_mode` | `OperationMode` | `OperationMode.NORMAL` | `OPERATION_MODE` | `NORMAL` (local + API), `ONLINE` (API only), or `OFFLINE` (local only). |
+| `operation_mode` | `OperationMode` | `OperationMode.NORMAL` | `OPERATION_MODE` | `NORMAL` (local + API), `ONLINE` (API only), `OFFLINE` (local only), or `COMPETITON` (API only + [compeition scoring](#competition-mode)). |
 | `environments_dir` | `str` | `"environment_files"` | `ENVIRONMENTS_DIR` | Directory to scan for local `metadata.json` files. |
 | `recordings_dir` | `str` | `"recordings"` | `RECORDINGS_DIR` | Directory to save game recordings (JSONL format). |
 | `logger` | `logging.Logger` | `None` | - | Optional logger instance. If not provided, a default logger logging to STDOUT is created. |
@@ -167,6 +178,18 @@ arc = Arcade(
     environments_dir="./my_games"
 )
 ```
+
+#### Competition Mode
+
+This mode is **REQUIRED** to show up on the Unverified leaderboard and forces the following behavior.
+
+- Environments must be interacted with via the API
+- Scoring is against all available environments, even if you choose not to interact with them
+- Only _Level Resets_ are premitted, _Game Resets_ are not allowed and become _Level Resets_
+- Can only interact (call `make`) a single time for each environment
+- Can only open a single Scorecard
+
+**Note:** The Kaggle Compeition is forced into this mode.
 
 #### Methods
 

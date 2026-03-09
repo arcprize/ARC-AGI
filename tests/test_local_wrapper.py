@@ -183,17 +183,17 @@ class TestLocalEnvironmentWrapper(unittest.TestCase):
         self.assertIsNone(wrapper, "Wrong version should return None")
 
     def test_make_bt11_fd9df0622a1b_with_action6(self):
-        """Test that bt11-fd9df0622a1b loads and four ACTION6 (GLICK) actions with x=1, y=1 get past the first level."""
+        """Test that bt33-a7c3f9d18b4e loads and four ACTION6 (GLICK) actions with x=1, y=1 get past the first level."""
         client = Arcade(
             operation_mode=OperationMode.OFFLINE,
             environments_dir=self.environments_dir,
             logger=self.logger,
         )
 
-        wrapper = client.make(game_id="bt11-fd9df0622a1b", scorecard_id="test-action6")
+        wrapper = client.make(game_id="bt33-a7c3f9d18b4e", scorecard_id="test-action6")
 
         self.assertIsNotNone(wrapper, "Wrapper should be created")
-        self.assertEqual(wrapper.environment_info.game_id, "bt11-fd9df0622a1b")
+        self.assertEqual(wrapper.environment_info.game_id, "bt33-a7c3f9d18b4e")
         self.assertEqual(wrapper.scorecard_id, "test-action6")
         self.assertIsNotNone(wrapper.environment_info.local_dir)
 

@@ -22,15 +22,16 @@ from .rendering import render_frames, render_frames_terminal
 from .scorecard import EnvironmentScorecard, ScorecardManager
 from .wrapper import EnvironmentWrapper
 
-# Load environment variables from .env.example first, then .env (with override)
+# Load environment variables from .env and then .env.example
 # Handle missing files and permission errors gracefully
 try:
-    load_dotenv(dotenv_path=".env.example")
+    load_dotenv(dotenv_path=".env")
 except (OSError, PermissionError, FileNotFoundError):
     pass
 
+
 try:
-    load_dotenv(dotenv_path=".env", override=True)
+    load_dotenv(dotenv_path=".env.example")
 except (OSError, PermissionError, FileNotFoundError):
     pass
 
@@ -46,6 +47,7 @@ class OperationMode(str, Enum):
     NORMAL = "normal"
     ONLINE = "online"
     OFFLINE = "offline"
+    COMPETITION = "competition"
 
 
 class Arcade:
@@ -74,7 +76,7 @@ class Arcade:
                 Can be overridden by ARC_BASE_URL environment variable.
             operation_mode: NORMAL (local + API), ONLINE (API only), or OFFLINE (local only).
                 Defaults to NORMAL. Can be overridden by OPERATION_MODE env var
-                ("normal", "online", "offline"), or by OFFLINE_ONLY/ONLINE_ONLY for backward compatibility.
+                ("normal", "online", "offline", "competition").
             environments_dir: Directory to scan for metadata.json files. Defaults to "environment_files".
                 Can be overridden by ENVIRONMENTS_DIR environment variable.
             recordings_dir: Directory to save recordings. Defaults to "recordings".
@@ -96,11 +98,17 @@ class Arcade:
         else:
             self.arc_base_url = os.getenv("ARC_BASE_URL", default_base_url)
 
+        # Priority order for competition mode is different, the env var takes precedence over the constructor arg
+        env_operation_mode = self._parse_operation_mode_from_env()
+
+        self.operation_mode: OperationMode = operation_mode
+
         # operation_mode: constructor arg > env var > default NORMAL
-        if operation_mode != OperationMode.NORMAL:
-            self.operation_mode: OperationMode = operation_mode
-        else:
-            self.operation_mode = self._parse_operation_mode_from_env()
+        if (
+            env_operation_mode == OperationMode.COMPETITION
+            or self.operation_mode == OperationMode.NORMAL
+        ):
+            self.operation_mode = env_operation_mode
 
         # environments_dir: constructor arg > env var > default
         default_environments_dir = "environment_files"
@@ -146,13 +154,17 @@ class Arcade:
         self.available_environments: list[EnvironmentInfo] = []
         self._scan_for_environments()
 
-        if self.operation_mode == OperationMode.ONLINE:
+        if (
+            self.operation_mode == OperationMode.ONLINE
+            or self.operation_mode == OperationMode.COMPETITION
+        ):
             self.headers = {
                 "X-API-Key": self.arc_api_key,
                 "Accept": "application/json",
             }
             self._session = requests.Session()
             self._session.headers.update(self.headers)
+            self._master_cookie_jar = requests.cookies.RequestsCookieJar()
 
         self._lock = threading.Lock()
         self._cookie_lock = threading.Lock()
@@ -170,9 +182,9 @@ class Arcade:
         self.on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None
 
     def _parse_operation_mode_from_env(self) -> OperationMode:
-        """Resolve operation mode from env: OPERATION_MODE, then OFFLINE_ONLY/ONLINE_ONLY."""
+        """Resolve operation mode from env: OPERATION_MODE"""
         env_op = os.getenv("OPERATION_MODE", "").strip().lower()
-        if env_op in ("normal", "online", "offline"):
+        if env_op in ("normal", "online", "offline", "competition"):
             return OperationMode(env_op)
         return OperationMode.NORMAL
 
@@ -398,7 +410,10 @@ class Arcade:
         Returns:
             The ID of the newly created scorecard.
         """
-        if self.operation_mode == OperationMode.ONLINE:
+        if (
+            self.operation_mode == OperationMode.ONLINE
+            or self.operation_mode == OperationMode.COMPETITION
+        ):
             url = f"{self.arc_base_url}/api/scorecard/open"
             headers = {
                 "X-API-Key": self.arc_api_key,
@@ -413,12 +428,20 @@ class Arcade:
                 payload["source_url"] = source_url
             if opaque is not None:
                 payload["opaque"] = opaque
+            if self.operation_mode == OperationMode.COMPETITION:
+                payload["competition_mode"] = True
+
+            with self._cookie_lock:
+                self._session.cookies.update(self._master_cookie_jar)  # type: ignore[no-untyped-call]
+
             response = self._session.post(
                 url, headers=headers, json=payload, timeout=10
             )
-            print(response.text)
+
+            with self._cookie_lock:
+                self._master_cookie_jar.update(self._session.cookies)  # type: ignore[no-untyped-call]
+
             response.raise_for_status()
-            print(response.json())
             card_id = response.json()["card_id"]
             self.logger.info(f"Created new scorecard: {card_id}")
             return str(card_id)
@@ -443,7 +466,10 @@ class Arcade:
             if scorecard_id is None:
                 return None
 
-            if self.operation_mode == OperationMode.ONLINE:
+            if (
+                self.operation_mode == OperationMode.ONLINE
+                or self.operation_mode == OperationMode.COMPETITION
+            ):
                 url = f"{self.arc_base_url}/api/scorecard/close"
                 headers = {
                     "X-API-Key": self.arc_api_key,
@@ -452,9 +478,17 @@ class Arcade:
                 data = {
                     "card_id": scorecard_id,
                 }
+
+                with self._cookie_lock:
+                    self._session.cookies.update(self._master_cookie_jar)  # type: ignore[no-untyped-call]
+
                 response = self._session.post(
                     url, headers=headers, json=data, timeout=10
                 )
+
+                with self._cookie_lock:
+                    self._master_cookie_jar.update(self._session.cookies)  # type: ignore[no-untyped-call]
+
                 response.raise_for_status()
                 if scorecard_id == self._default_scorecard_id:
                     self._default_scorecard_id = None
@@ -490,20 +524,29 @@ class Arcade:
             EnvironmentScorecard object if found, None otherwise.
         """
         with self._lock:
-            print(f"scorecard_id: {scorecard_id}")
             if scorecard_id is None:
                 if self._default_scorecard_id is None:
                     # Create default scorecard if it doesn't exist
                     self._default_scorecard_id = self._create_scorecard_no_lock()
                 scorecard_id = self._default_scorecard_id
 
-            if self.operation_mode == OperationMode.ONLINE:
+            if (
+                self.operation_mode == OperationMode.ONLINE
+                or self.operation_mode == OperationMode.COMPETITION
+            ):
                 url = f"{self.arc_base_url}/api/scorecard/{scorecard_id}"
                 headers = {
                     "X-API-Key": self.arc_api_key,
                     "Accept": "application/json",
                 }
+                with self._cookie_lock:
+                    self._session.cookies.update(self._master_cookie_jar)  # type: ignore[no-untyped-call]
+
                 response = self._session.get(url, headers=headers, timeout=10)
+
+                with self._cookie_lock:
+                    self._master_cookie_jar.update(self._session.cookies)  # type: ignore[no-untyped-call]
+
                 response.raise_for_status()
                 return self._convert_scorecard_to_environment_scorecard(response.json())
 
@@ -1018,6 +1061,7 @@ class Arcade:
 
         app, api = create_app(
             self,
+            competition_mode=competition_mode,
             save_all_recordings=save_all_recordings,
             add_cookie=add_cookie,
             on_scorecard_close=on_scorecard_close,

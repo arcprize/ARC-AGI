@@ -158,6 +158,20 @@ class TestARCAGI3EnvironmentVariables(unittest.TestCase):
 
         self.assertEqual(client.operation_mode, OperationMode.ONLINE)
 
+    def test_operation_mode_competition(self):
+        """Test that constructor ONLINE overrides env var."""
+        os.environ["OPERATION_MODE"] = "competition"
+        client = Arcade()
+
+        self.assertEqual(client.operation_mode, OperationMode.COMPETITION)
+
+    def test_operation_mode_competition_from_env_overrides_constructor(self):
+        """Test that constructor ONLINE overrides env var."""
+        os.environ["OPERATION_MODE"] = "competition"
+        client = Arcade(operation_mode=OperationMode.ONLINE)
+
+        self.assertEqual(client.operation_mode, OperationMode.COMPETITION)
+
 
 class TestARCAGI3BooleanParsing(unittest.TestCase):
     """Test boolean/enum parsing from environment variables."""

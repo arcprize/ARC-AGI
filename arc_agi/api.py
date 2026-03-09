@@ -9,6 +9,7 @@ from flask import Response, jsonify, request
 from pydantic import ValidationError
 
 from .base import Arcade
+from .local_wrapper import LocalEnvironmentWrapper
 from .models import APIError
 from .scorecard import EnvironmentScorecard
 from .wrapper import EnvironmentWrapper
@@ -34,6 +35,7 @@ class RestAPI:
         self._environmentCache: dict[str, EnvironmentWrapper] = {}
         self._cache_lock = threading.Lock()
         self.renderer = renderer
+        self.scorecard_openned = False
 
     def _json_with_cookie(
         self,
@@ -48,13 +50,18 @@ class RestAPI:
         return resp
 
     def get_games(self) -> Tuple[Response, int]:
-        out = [e.model_dump(mode="json") for e in self.arcade.available_environments]
+        out = [
+            e.model_dump(mode="json", exclude={"private_tags", "level_tags"})
+            for e in self.arcade.available_environments
+        ]
         return jsonify(out), 200
 
     def get_game_info(self, game_id: str) -> Tuple[Response, int]:
         for env in self.arcade.available_environments:
             if env.game_id == game_id or env.game_id.startswith(f"{game_id}-"):
-                return jsonify(env.model_dump(mode="json")), 200
+                return jsonify(
+                    env.model_dump(mode="json", exclude={"private_tags", "level_tags"})
+                ), 200
         return jsonify(
             {
                 "error": APIError.SERVER_ERROR,
@@ -79,6 +86,14 @@ class RestAPI:
                 }
             ), 404
 
+        if scorecard.competition_mode:
+            return jsonify(
+                {
+                    "error": APIError.SERVER_ERROR,
+                    "message": "cannot get scorecard that is in competition mode",
+                }
+            ), 403
+
         if game_id is not None:
             return self._json_with_cookie(
                 scorecard.get_json_for(game_id),
@@ -101,6 +116,14 @@ class RestAPI:
             ), 200
 
     def new_scorecard(self) -> Tuple[Response, int]:
+        if self.competition_mode and self.scorecard_openned:
+            return jsonify(
+                {
+                    "error": APIError.SERVER_ERROR,
+                    "message": "cannot open multiple scorecards in competition mode",
+                }
+            ), 409
+
         data = request.get_json()
         if not isinstance(data, dict):
             return jsonify({"error": "request body must be a JSON object"}), 400
@@ -117,18 +140,28 @@ class RestAPI:
             return jsonify({"error": "opaque exceeds 8 KB limit"}), 400
         # -----------------------------------------------------------------
 
+        self.scorecard_openned = True
+
         tags = data.get("tags", [])
         if "human" not in tags and "agent" not in tags:
             tags.append("agent")
 
         source_url = data.get("source_url")
         api_key = request.headers.get("X-API-Key", "1234")
+        competition_mode_raw = data.get("competition_mode")
+
+        competition_mode: bool | None = None
+
+        # if the server is in competition mode or the client is in competition mode, set competition_mode to True
+        if self.competition_mode or competition_mode_raw is not None:
+            competition_mode = True
 
         card_id = self.arcade.scorecard_manager.new_scorecard(
             source_url=source_url,
             tags=tags,
             api_key=api_key,
             opaque=opaque,  # original Python value
+            competition_mode=competition_mode,
         )
         return self._json_with_cookie(
             {"card_id": card_id},
@@ -146,6 +179,23 @@ class RestAPI:
             ), 400
 
         api_key = request.headers.get("X-API-Key", "1234")
+
+        envs = self.arcade.available_environments
+
+        scorecard = self.arcade.scorecard_manager.get_scorecard(
+            data["card_id"], api_key
+        )
+        # IF this is a competition scorecard, we need to create all the environments for it
+        if (
+            scorecard is not None
+            and scorecard.competition_mode is not None
+            and scorecard.competition_mode
+        ):
+            for env in envs:
+                if not scorecard.has_environment(env.game_id):
+                    self.arcade.make(env.game_id, scorecard_id=scorecard.card_id)
+
+        api_key = request.headers.get("X-API-Key", "1234")
         scorecard, guids, _ = self.arcade.scorecard_manager.close_scorecard(
             data["card_id"], api_key
         )
@@ -157,7 +207,6 @@ class RestAPI:
                 }
             ), 404
 
-        envs = self.arcade.available_environments
         if envs is None:
             return jsonify(
                 {
@@ -165,9 +214,13 @@ class RestAPI:
                     "message": "no environments available",
                 }
             ), 500
+
+        out_internal = EnvironmentScorecard.from_scorecard(
+            scorecard, envs, do_private_tags=True
+        )
         out = EnvironmentScorecard.from_scorecard(scorecard, envs)
         if self.on_scorecard_close is not None:
-            self.on_scorecard_close(out)
+            self.on_scorecard_close(out_internal)
         if guids is not None:
             for guid in guids:
                 self.cleanup_environment(guid)
@@ -187,14 +240,6 @@ class RestAPI:
                     "message": "missing `game_id` in action data",
                 }
             ), 400
-
-        # if data["game_id"] not in os.environ.get("GAMES", "").split(","):
-        #     return jsonify(
-        #         {
-        #             "error": APIError.GAME_NOT_AVAILABLE_ERROR.name,
-        #             "message": f"game {data['game_id']} is not available, check to make sure its included in your local .env",
-        #         }
-        #     ), 400
 
         try:
             action.validate_data(data)
@@ -248,15 +293,40 @@ class RestAPI:
                     reasoning=data.get("reasoning"),
                 )
                 # Only send the action if not a full reset (brand new game)
-                response = (
-                    g.step(
-                        action=input_action.id,
-                        data=input_action.data,
-                        reasoning=input_action.reasoning,
-                    )
-                    if not full_reset
-                    else g.observation_space
-                )
+
+                if not full_reset:
+                    if (
+                        action == GameAction.RESET
+                        and isinstance(g, LocalEnvironmentWrapper)
+                        and g._game is not None
+                    ):
+                        scorecard = self.arcade.scorecard_manager.get_scorecard(
+                            data.get("card_id", None), api_key
+                        )
+                        # This is quite hacky as we have to look inside the underlying ARCBaseGame
+                        # to check if this is the first action of the level and would cause a full reset,
+                        if (
+                            scorecard is not None
+                            and scorecard.competition_mode
+                            and g._game._action_count == 0
+                        ):
+                            response = g.observation_space
+                            if response is not None:
+                                scorecard.update_scorecard(guid, response, full_reset)
+                        else:
+                            response = g.step(
+                                action=input_action.id,
+                                data=input_action.data,
+                                reasoning=input_action.reasoning,
+                            )
+                    else:
+                        response = g.step(
+                            action=input_action.id,
+                            data=input_action.data,
+                            reasoning=input_action.reasoning,
+                        )
+                else:
+                    response = g.observation_space
                 if response is None:
                     return jsonify(
                         {
@@ -323,6 +393,14 @@ class RestAPI:
             if not scorecard_id:
                 return None, False
 
+            scorecard = self.arcade.scorecard_manager.get_scorecard(
+                scorecard_id, api_key
+            )
+            if scorecard is None:
+                return None, False
+            if scorecard.competition_mode and scorecard.has_environment(game_id):
+                return None, False
+
             game = self.arcade.make(
                 game_id,
                 scorecard_id=scorecard_id,
@@ -355,7 +433,9 @@ class RestAPI:
                 if scorecard is not None:
                     if self.arcade._on_scorecard_close is not None:
                         envScorecard = EnvironmentScorecard.from_scorecard(
-                            scorecard, self.arcade.available_environments
+                            scorecard,
+                            self.arcade.available_environments,
+                            do_private_tags=True,
                         )
                         self.arcade._on_scorecard_close(envScorecard)
                     if guids is not None:
