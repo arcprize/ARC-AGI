@@ -188,6 +188,7 @@ This mode is **REQUIRED** to show up on the Unverified leaderboard and forces th
 - Only _Level Resets_ are premitted, _Game Resets_ are not allowed and become _Level Resets_
 - Can only interact (call `make`) a single time for each environment
 - Can only open a single Scorecard
+- Cannot get scoring of an inflight scorecard, `get_scorecard` does not work
 
 **Note:** The Kaggle Compeition is forced into this mode.
 
