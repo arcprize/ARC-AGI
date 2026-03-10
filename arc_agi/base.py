@@ -586,6 +586,7 @@ class Arcade:
         seed: int = 0,
         scorecard_id: Optional[str] = None,
         save_recording: bool = False,
+        include_frame_data: bool = True,
         render_mode: Optional[str] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
     ) -> Optional[EnvironmentWrapper]:
@@ -627,6 +628,7 @@ class Arcade:
                     version,
                     scorecard_id,
                     save_recording,
+                    include_frame_data,
                     seed,
                     render_mode,
                     renderer,
@@ -639,6 +641,7 @@ class Arcade:
                     version,
                     scorecard_id,
                     save_recording,
+                    include_frame_data,
                     seed,
                     render_mode,
                     renderer,
@@ -646,7 +649,13 @@ class Arcade:
 
             # ONLINE mode: create remote wrapper
             return self._create_remote_wrapper(
-                base_id, version, scorecard_id, save_recording, render_mode, renderer
+                base_id,
+                version,
+                scorecard_id,
+                save_recording,
+                include_frame_data,
+                render_mode,
+                renderer,
             )
 
     def _find_local_game(
@@ -655,6 +664,7 @@ class Arcade:
         version: Optional[str],
         scorecard_id: str,
         save_recording: bool,
+        include_frame_data: bool,
         seed: int = 0,
         render_mode: Optional[str] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
@@ -698,7 +708,13 @@ class Arcade:
                         )
                         return None
                     return self._create_wrapper(
-                        env, scorecard_id, save_recording, seed, render_mode, renderer
+                        env,
+                        scorecard_id,
+                        save_recording,
+                        include_frame_data,
+                        seed,
+                        render_mode,
+                        renderer,
                     )
 
             self.logger.error(
@@ -725,7 +741,13 @@ class Arcade:
             f"(downloaded: {latest_env.date_downloaded})"
         )
         return self._create_wrapper(
-            latest_env, scorecard_id, save_recording, seed, render_mode, renderer
+            latest_env,
+            scorecard_id,
+            save_recording,
+            include_frame_data,
+            seed,
+            render_mode,
+            renderer,
         )
 
     def _create_wrapper(
@@ -733,6 +755,7 @@ class Arcade:
         env_info: EnvironmentInfo,
         scorecard_id: str,
         save_recording: bool,
+        include_frame_data: bool,
         seed: int = 0,
         render_mode: Optional[str] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
@@ -761,6 +784,7 @@ class Arcade:
                 logger=self.logger,
                 scorecard_id=scorecard_id,
                 save_recording=save_recording,
+                include_frame_data=include_frame_data,
                 recordings_dir=self.recordings_dir,
                 scorecard_manager=self.scorecard_manager,
                 renderer=final_renderer,
@@ -834,6 +858,7 @@ class Arcade:
         version: Optional[str],
         scorecard_id: str,
         save_recording: bool,
+        include_frame_data: bool,
         render_mode: Optional[str] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
     ) -> Optional[RemoteEnvironmentWrapper]:
@@ -894,6 +919,7 @@ class Arcade:
                 logger=self.logger,
                 scorecard_id=scorecard_id,
                 save_recording=save_recording,
+                include_frame_data=include_frame_data,
                 recordings_dir=self.recordings_dir,
                 scorecard_manager=self.scorecard_manager,
                 renderer=final_renderer,
@@ -915,6 +941,7 @@ class Arcade:
         version: Optional[str],
         scorecard_id: str,
         save_recording: bool,
+        include_frame_data: bool,
         seed: int = 0,
         render_mode: Optional[str] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
@@ -942,6 +969,7 @@ class Arcade:
                     version,
                     scorecard_id,
                     save_recording,
+                    include_frame_data,
                     seed,
                     render_mode,
                     renderer,
@@ -998,7 +1026,13 @@ class Arcade:
             game_class_file = env_dir / f"{class_name.lower()}.py"
             if game_class_file.exists():
                 return self._create_wrapper(
-                    env_info, scorecard_id, save_recording, seed, render_mode, renderer
+                    env_info,
+                    scorecard_id,
+                    save_recording,
+                    include_frame_data,
+                    seed,
+                    render_mode,
+                    renderer,
                 )
 
             # Download source code
@@ -1027,7 +1061,13 @@ class Arcade:
 
             # Create and return LocalEnvironmentWrapper
             return self._create_wrapper(
-                env_info, scorecard_id, save_recording, seed, render_mode, renderer
+                env_info,
+                scorecard_id,
+                save_recording,
+                include_frame_data,
+                seed,
+                render_mode,
+                renderer,
             )
 
         except requests.exceptions.RequestException as e:
@@ -1049,6 +1089,7 @@ class Arcade:
         port: int = 8001,
         competition_mode: bool = False,
         save_all_recordings: bool = False,
+        include_frame_data: bool = True,
         add_cookie: Optional[Callable[[Response, str], Response]] = None,
         scorecard_timeout: Optional[int] = None,
         on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None,
@@ -1063,6 +1104,7 @@ class Arcade:
             self,
             competition_mode=competition_mode,
             save_all_recordings=save_all_recordings,
+            include_frame_data=include_frame_data,
             add_cookie=add_cookie,
             on_scorecard_close=on_scorecard_close,
             renderer=renderer,

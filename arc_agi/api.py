@@ -23,6 +23,7 @@ class RestAPI:
         arcade: Arcade,
         competition_mode: bool = False,
         save_all_recordings: bool = False,
+        include_frame_data: bool = True,
         add_cookie: Optional[Callable[[Response, str], Response]] = None,
         on_scorecard_close: Optional[Callable[[EnvironmentScorecard], None]] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
@@ -30,6 +31,7 @@ class RestAPI:
         self.arcade = arcade
         self.competition_mode = competition_mode
         self.save_all_recordings = save_all_recordings
+        self.include_frame_data = include_frame_data
         self.add_cookie = add_cookie
         self.on_scorecard_close = on_scorecard_close
         self._environmentCache: dict[str, EnvironmentWrapper] = {}
@@ -193,7 +195,12 @@ class RestAPI:
         ):
             for env in envs:
                 if not scorecard.has_environment(env.game_id):
-                    self.arcade.make(env.game_id, scorecard_id=scorecard.card_id)
+                    self.arcade.make(
+                        env.game_id,
+                        scorecard_id=scorecard.card_id,
+                        save_recording=self.save_all_recordings,
+                        include_frame_data=self.include_frame_data,
+                    )
 
         api_key = request.headers.get("X-API-Key", "1234")
         scorecard, guids, _ = self.arcade.scorecard_manager.close_scorecard(
@@ -405,6 +412,7 @@ class RestAPI:
                 game_id,
                 scorecard_id=scorecard_id,
                 save_recording=self.save_all_recordings,
+                include_frame_data=self.include_frame_data,
                 renderer=self.renderer,
             )
             if game is None:

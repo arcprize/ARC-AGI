@@ -438,8 +438,6 @@ class TestEnvironmentScorecard(unittest.TestCase):
             scorecard, [env_info], do_private_tags=True
         )
 
-        print(scorecard_result.tags_scores)
-
         # Score should be (10/10) * 100 = 100
         self.assertAlmostEqual(scorecard_result.environments[0].score, 55.0, places=5)
         self.assertAlmostEqual(scorecard_result.score, 55.0)  # Average of one score

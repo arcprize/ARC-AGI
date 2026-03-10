@@ -120,6 +120,11 @@ You can render games in two ways:
    ```
 
 ## Changelog
+## [0.9.4] - 2026-03-10
+
+### Added
+- `include_frame_data` parameter in `make` and `listen_and_serve`
+
 ## [0.9.3] - 2026-03-09
 
 ### Added
@@ -194,7 +199,7 @@ This mode is **REQUIRED** to show up on the Unverified leaderboard and forces th
 
 #### Methods
 
-##### `make(game_id, seed=0, scorecard_id=None, save_recording=False, render_mode=None, renderer=None)`
+##### `make(game_id, seed=0, scorecard_id=None, save_recording=False, include_frame_data=True, render_mode=None, renderer=None)`
 
 Create and initialize an environment wrapper for a specific game.
 
@@ -203,6 +208,7 @@ Create and initialize an environment wrapper for a specific game.
 - `seed` (`int`, optional): Random seed for the game. Defaults to `0`.
 - `scorecard_id` (`str`, optional): Scorecard ID for tracking runs. If `None` is provided (the default), the system will create and maintain a single default scorecard that is automatically reused across all `make()` calls. This allows you to track multiple games in the same scorecard without explicitly managing scorecard IDs.
 - `save_recording` (`bool`, optional): Whether to save recordings to JSONL file. Defaults to `False`.
+- `include_frame_data` (`bool` optional): If recording set where to include frame data in the JSONL
 - `render_mode` (`str`, optional): Render mode string (`"human"`, `"terminal"`, `"terminal-fast"`). If provided, creates a renderer automatically.
 - `renderer` (`Callable[[int, FrameDataRaw], None]`, optional): Custom renderer function. If both `render_mode` and `renderer` are provided, `renderer` takes precedence.
 
@@ -302,6 +308,7 @@ Start a blocking Flask server that exposes the REST API. Uses `arc_agi.server.cr
 - `port` (`int`, optional): Port to listen on. Default `8001`.
 - `competition_mode` (`bool`, optional): If `True`, enable competition mode. Default `False`.
 - `save_all_recordings` (`bool`, optional): If `True`, save recordings for all runs. Default `False`.
+- `include_frame_data` (`bool` optional): If recording set where to include frame data in the JSONL. Default `True`.
 - `add_cookie` (`Callable[[Response, str], Response]`, optional): Callback to inject a cookie into API responses. Receives `(response, api_key)`; must return the modified response. Use for session stickiness (e.g. ALB app cookies).
 - `scorecard_timeout` (`int`, optional): Idle timeout in seconds before scorecards are auto-closed. If set, starts a background cleanup loop.
 - `on_scorecard_close` (`Callable[[EnvironmentScorecard], None]`, optional): Callback invoked when a scorecard is closed (manually or by timeout).

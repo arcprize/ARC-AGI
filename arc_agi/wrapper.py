@@ -26,6 +26,7 @@ class EnvironmentWrapper:
         logger: logging.Logger,
         scorecard_id: str,
         save_recording: bool = False,
+        include_frame_data: bool = True,
         recordings_dir: str = "recordings",
         scorecard_manager: Optional[ScorecardManager] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
@@ -37,6 +38,7 @@ class EnvironmentWrapper:
             logger: Logger instance for logging.
             scorecard_id: Optional scorecard ID for tracking runs.
             save_recording: Whether to save recordings to JSONL file.
+            include_frame_data: Whether to include frame data in the recording file.
             recordings_dir: Directory to save recordings.
             scorecard_manager: Optional scorecard manager for tracking.
             renderer: Optional callable that accepts FrameDataRaw and performs custom rendering.
@@ -45,6 +47,7 @@ class EnvironmentWrapper:
         self.logger = logger
         self.scorecard_id = scorecard_id
         self.save_recording = save_recording
+        self.include_frame_data = include_frame_data
         self.recordings_dir = recordings_dir
         self.scorecard_manager = scorecard_manager
         self.renderer = renderer
@@ -139,12 +142,6 @@ class EnvironmentWrapper:
             # Convert FrameDataRaw to JSON-serializable dict
             data: dict[str, Any] = {
                 "game_id": resp.game_id,
-                "frame": [
-                    frame_layer.tolist()
-                    if hasattr(frame_layer, "tolist")
-                    else frame_layer
-                    for frame_layer in resp.frame
-                ],
                 "state": resp.state.name
                 if hasattr(resp.state, "name")
                 else str(resp.state),
@@ -165,6 +162,13 @@ class EnvironmentWrapper:
                 "full_reset": getattr(resp, "full_reset", False),
                 "available_actions": resp.available_actions,
             }
+            if self.include_frame_data:
+                data["frame"] = [
+                    frame_layer.tolist()
+                    if hasattr(frame_layer, "tolist")
+                    else frame_layer
+                    for frame_layer in resp.frame
+                ]
 
             self._record(data)
 

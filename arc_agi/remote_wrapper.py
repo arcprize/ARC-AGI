@@ -29,6 +29,7 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
         logger: logging.Logger,
         scorecard_id: str,
         save_recording: bool = False,
+        include_frame_data: bool = True,
         recordings_dir: str = "recordings",
         scorecard_manager: Optional[Any] = None,
         renderer: Optional[Callable[[int, FrameDataRaw], None]] = None,
@@ -44,6 +45,7 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
             logger: Logger instance for logging.
             scorecard_id: Scorecard ID for tracking runs.
             save_recording: Whether to save recordings to JSONL file.
+            include_frame_data: Whether to include frame data in the recording file.
             recordings_dir: Directory to save recordings.
             scorecard_manager: Optional scorecard manager for tracking.
             renderer: Optional callable that accepts FrameDataRaw and performs custom rendering.
@@ -53,6 +55,7 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
             logger,
             scorecard_id,
             save_recording,
+            include_frame_data,
             recordings_dir,
             scorecard_manager,
             renderer,

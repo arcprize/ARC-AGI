@@ -208,3 +208,6 @@ __marimo__/
 
 environment_files/
 recordings/
+
+test_*.py
+rest*.py
