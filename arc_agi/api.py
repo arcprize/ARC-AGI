@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 import time
 import uuid
@@ -339,7 +340,7 @@ class RestAPI:
                         scorecard = self.arcade.scorecard_manager.get_scorecard(
                             data.get("card_id", None), api_key
                         )
-                        if scorecard is not None:
+                        if scorecard is not None and response is not None:
                             scorecard.update_scorecard(guid, response, True)
 
                 if response is None:
