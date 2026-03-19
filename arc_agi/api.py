@@ -38,6 +38,7 @@ class RestAPI:
         self._cache_lock = threading.Lock()
         self.renderer = renderer
         self.scorecard_openned = False
+        self.level_reset_only = os.getenv("ONLY_RESET_LEVELS") == "true"
 
     def _json_with_cookie(
         self,
@@ -334,6 +335,13 @@ class RestAPI:
                         )
                 else:
                     response = g.observation_space
+                    if self.level_reset_only:
+                        scorecard = self.arcade.scorecard_manager.get_scorecard(
+                            data.get("card_id", None), api_key
+                        )
+                        if scorecard is not None:
+                            scorecard.update_scorecard(guid, response, True)
+
                 if response is None:
                     return jsonify(
                         {

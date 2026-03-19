@@ -120,6 +120,11 @@ You can render games in two ways:
    ```
 
 ## Changelog
+## [0.9.5] - 2026-03-19
+
+### Fix
+- Issues with scorecards not updating when `ONLY_RESET_LEVELS` envvar was set.
+
 ## [0.9.4] - 2026-03-10
 
 ### Added
