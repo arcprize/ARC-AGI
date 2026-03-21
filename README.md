@@ -120,7 +120,7 @@ You can render games in two ways:
    ```
 
 ## Changelog
-## [0.9.6] - 2026-03-19
+## [0.9.6] - 2026-03-21
 
 ### Fix
 - Issue with scoring being when in GAME_OVER and recieved command
