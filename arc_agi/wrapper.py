@@ -184,7 +184,7 @@ class EnvironmentWrapper:
                 )
 
         # Update scorecard if manager is available
-        if self.scorecard_manager and resp.guid:
+        if self.scorecard_manager and resp.guid and len(resp.frame) > 0:
             try:
                 # Register guid with scorecard if not already registered
                 self.scorecard_manager.add_game(self.scorecard_id, resp.guid)
