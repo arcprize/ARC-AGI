@@ -149,6 +149,58 @@ class TestLocalEnvironmentWrapper(unittest.TestCase):
         self.assertGreater(len(action_space), 0, "Action space should have actions")
         self.assertIn(GameAction.ACTION3, action_space, "ACTION3 should be available")
 
+    def test_make_bt11_that_command_at_game_over_does_not_add_to_scorecard(self):
+        """Test that four ACTION3 (move left) steps get past the first level."""
+        client = Arcade(
+            operation_mode=OperationMode.OFFLINE,
+            environments_dir=self.environments_dir,
+            logger=self.logger,
+        )
+
+        card_id = client.create_scorecard()
+
+        wrapper = client.make(game_id="bt11", scorecard_id=card_id)
+
+        self.assertIsNotNone(wrapper)
+
+        # Perform four ACTION3 (move left) actions, this gets us past the first level
+        for i in range(4):
+            frame_data = wrapper.step(GameAction.ACTION3)
+            self.assertIsNotNone(frame_data, f"Step {i + 1} should return FrameDataRaw")
+            self.logger.info(
+                f"Step {i + 1}: state={frame_data.state}, level={frame_data.levels_completed}"
+            )
+
+        # Perform eight ACTION4 (move right) actions to get to game over
+        for i in range(8):
+            frame_data = wrapper.step(GameAction.ACTION4)
+            self.assertIsNotNone(frame_data, f"Step {i + 1} should return FrameDataRaw")
+            self.logger.info(
+                f"Step {i + 1}: state={frame_data.state}, level={frame_data.levels_completed}"
+            )
+
+        self.assertEqual(frame_data.state, GameState.GAME_OVER)
+
+        # Perform one ACTION4 (move left) action to get send a game over to a bad game
+        frame_data = wrapper.step(GameAction.ACTION4)
+        self.assertIsNotNone(frame_data, f"Step {i + 1} should return FrameDataRaw")
+        self.assertEqual(len(frame_data.frame), 0)
+
+        wrapper.reset()
+
+        # Perform eight ACTION3 (move left) actions, this gets us past the second level
+        for i in range(8):
+            frame_data = wrapper.step(GameAction.ACTION3)
+            self.assertIsNotNone(frame_data, f"Step {i + 1} should return FrameDataRaw")
+            self.logger.info(
+                f"Step {i + 1}: state={frame_data.state}, level={frame_data.levels_completed}"
+            )
+
+        scorecard = client.get_scorecard(card_id)
+
+        # Step count for level 2 should be 17, 8 ACTION4s for Game Over, 1 RESET, 8 ACTION3s for Level 2
+        self.assertEqual(scorecard.environments[0].runs[0].level_actions[1], 17)
+
     def test_make_invalid_game_id(self):
         """Test that invalid game_id format returns None."""
         client = Arcade(
