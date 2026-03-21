@@ -199,7 +199,7 @@ class TestLocalEnvironmentWrapper(unittest.TestCase):
         scorecard = client.get_scorecard(card_id)
 
         # Step count for level 2 should be 17, 8 ACTION4s for Game Over, 1 RESET, 8 ACTION3s for Level 2
-        self.assertEqual(scorecard.environments[0].runs[0].level_actions[1], 17)         
+        self.assertEqual(scorecard.environments[0].runs[0].level_actions[1], 17)
 
     def test_make_invalid_game_id(self):
         """Test that invalid game_id format returns None."""
