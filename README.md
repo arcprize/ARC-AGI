@@ -13,7 +13,7 @@ ARC-AGI Toolkit is an open-sourced python interface (API) for ARC-AGI-3 interact
    pip install arc-agi
    ```
 
-2. **API Key**: You can optionally set the `ARC_API_KEY` environment variable with your API key. If no key is provided, an anonymous key will be used. However, registering for an API key will give you access to more games at release. [Register for an API key at https://three.arcprize.org](https://three.arcprize.org)
+2. **API Key**: You can optionally set the `ARC_API_KEY` environment variable with your API key. If no key is provided, an anonymous key will be used. However, registering for an API key will give you access to more games at release. [Register for an API key at https://arcprize.org/platform](https://arcprize.org/platform)
    
    The code supports loading from `.env` and `.env.example` files (using python-dotenv), or you can set it directly:
    ```bash
@@ -174,7 +174,7 @@ The `Arcade` constructor accepts the following parameters. All parameters can be
 | Parameter | Type | Default | Environment Variable | Description |
 |-----------|------|---------|---------------------|-------------|
 | `arc_api_key` | `str` | `""` | `ARC_API_KEY` | API key for ARC API. If empty and not in offline mode, an anonymous key will be automatically fetched. |
-| `arc_base_url` | `str` | `"https://three.arcprize.org"` | `ARC_BASE_URL` | Base URL for the ARC API. |
+| `arc_base_url` | `str` | `"https://arcprize.org"` | `ARC_BASE_URL` | Base URL for the ARC API. |
 | `operation_mode` | `OperationMode` | `OperationMode.NORMAL` | `OPERATION_MODE` | `NORMAL` (local + API), `ONLINE` (API only), `OFFLINE` (local only), or `COMPETITON` (API only + [compeition scoring](#competition-mode)). |
 | `environments_dir` | `str` | `"environment_files"` | `ENVIRONMENTS_DIR` | Directory to scan for local `metadata.json` files. |
 | `recordings_dir` | `str` | `"recordings"` | `RECORDINGS_DIR` | Directory to save game recordings (JSONL format). |
