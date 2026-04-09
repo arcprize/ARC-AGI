@@ -145,7 +145,7 @@ class Arcade:
             self.logger.addHandler(stdout_handler)
 
         # Create scorecard manager
-        self.scorecard_manager = ScorecardManager()
+        self.scorecard_manager = ScorecardManager(recordings_dir=self.recordings_dir)
 
         # Store default scorecard_id (will be created on first make() call if needed)
         self._default_scorecard_id: Optional[str] = None
