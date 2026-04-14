@@ -55,7 +55,10 @@ class RestAPI:
 
     def get_games(self) -> Tuple[Response, int]:
         out = [
-            e.model_dump(mode="json", exclude={"private_tags", "level_tags"})
+            e.model_dump(
+                mode="json",
+                exclude={"private_tags", "level_tags", "baseline_actions"},
+            )
             for e in self.arcade.available_environments
         ]
         return jsonify(out), 200
@@ -64,7 +67,14 @@ class RestAPI:
         for env in self.arcade.available_environments:
             if env.game_id == game_id or env.game_id.startswith(f"{game_id}-"):
                 return jsonify(
-                    env.model_dump(mode="json", exclude={"private_tags", "level_tags"})
+                    env.model_dump(
+                        mode="json",
+                        exclude={
+                            "private_tags",
+                            "level_tags",
+                            "baseline_actions",
+                        },
+                    )
                 ), 200
         return jsonify(
             {
@@ -120,13 +130,15 @@ class RestAPI:
             ), 200
 
     def new_scorecard(self) -> Tuple[Response, int]:
-        if self.competition_mode and self.scorecard_openned:
-            return jsonify(
-                {
-                    "error": APIError.SERVER_ERROR,
-                    "message": "cannot open multiple scorecards in competition mode",
-                }
-            ), 409
+        with self._cache_lock:
+            if self.competition_mode and self.scorecard_openned:
+                return jsonify(
+                    {
+                        "error": APIError.SERVER_ERROR,
+                        "message": "cannot open multiple scorecards in competition mode",
+                    }
+                ), 409
+            self.scorecard_openned = True
 
         data = request.get_json()
         if not isinstance(data, dict):
@@ -143,8 +155,6 @@ class RestAPI:
         if len(opaque_bytes) > MAX_OPAQUE_BYTES:
             return jsonify({"error": "opaque exceeds 8 KB limit"}), 400
         # -----------------------------------------------------------------
-
-        self.scorecard_openned = True
 
         tags = data.get("tags", [])
         if "human" not in tags and "agent" not in tags:
@@ -376,9 +386,6 @@ class RestAPI:
                 out = python_frame.model_dump()
                 out["state"] = out["state"].name
                 out["action_input"]["id"] = out["action_input"]["id"].value
-                # arcade.scorecard_manager.update_scorecard(
-                #     guid, python_frame, full_reset or response.full_reset
-                # )
                 return self._json_with_cookie(out, api_key=api_key), 200
             except ValidationError as exc:
                 return jsonify(
@@ -440,21 +447,50 @@ class RestAPI:
         while True:
             time.sleep(60)
             stale_ids = self.arcade.scorecard_manager.get_stale_cards()
+            mgr = self.arcade.scorecard_manager
             for cid in stale_ids:
+                if not mgr.should_auto_close_scorecard(cid):
+                    self.arcade.logger.info(
+                        "[auto-close] scorecard %s no longer eligible for auto-close, skipping",
+                        cid,
+                    )
+                    continue
+                idle = mgr.idle_duration_for(cid)
+                idle_sec = idle.total_seconds() if idle is not None else -1.0
                 self.arcade.logger.info(
-                    f"[auto-close] scorecard {cid} idle > {self.arcade.scorecard_manager.idle_for.total_seconds() / 60} min"
+                    "[auto-close] closing scorecard card_id=%s idle_seconds=%.1f "
+                    "threshold_seconds=%.1f",
+                    cid,
+                    idle_sec,
+                    mgr.idle_for.total_seconds(),
                 )
                 scorecard, guids, _ = self.arcade.scorecard_manager.close_scorecard(
                     cid, None
                 )
                 if scorecard is not None:
                     if self.arcade._on_scorecard_close is not None:
-                        envScorecard = EnvironmentScorecard.from_scorecard(
+                        env_scorecard = EnvironmentScorecard.from_scorecard(
                             scorecard,
                             self.arcade.available_environments,
                             do_private_tags=True,
                         )
-                        self.arcade._on_scorecard_close(envScorecard)
+                        cb = self.arcade._on_scorecard_close
+                        log = self.arcade.logger
+
+                        def _run_close_hook() -> None:
+                            try:
+                                cb(env_scorecard)
+                            except Exception:
+                                log.exception(
+                                    "[auto-close] on_scorecard_close failed for card_id=%s",
+                                    env_scorecard.card_id,
+                                )
+
+                        threading.Thread(
+                            target=_run_close_hook,
+                            daemon=True,
+                            name=f"scorecard-close-{cid[:8]}",
+                        ).start()
                     if guids is not None:
                         for guid in guids:
                             self.cleanup_environment(guid)

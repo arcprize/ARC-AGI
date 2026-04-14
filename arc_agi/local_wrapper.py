@@ -3,6 +3,7 @@
 import importlib.util
 import inspect
 import logging
+import threading
 import uuid
 from pathlib import Path
 from typing import Any, Callable, Optional, Type, cast
@@ -11,6 +12,10 @@ from arcengine import ARCBaseGame, FrameDataRaw, GameAction
 
 from .models import EnvironmentInfo
 from .wrapper import EnvironmentWrapper
+
+# Resolved game file + class name -> ARCBaseGame subclass (avoid repeated exec per process)
+_game_class_cache: dict[str, Type[ARCBaseGame]] = {}
+_game_class_cache_lock = threading.Lock()
 
 
 class LocalEnvironmentWrapper(EnvironmentWrapper):
@@ -102,40 +107,58 @@ class LocalEnvironmentWrapper(EnvironmentWrapper):
             )
             return
 
-        try:
-            # Read source code
-            source_code = game_file.read_text(encoding="utf-8")
-        except Exception as e:
-            self.logger.exception(f"Failed to read game source from {game_file}: {e}")
-            return
+        cache_key = f"{game_file.resolve()}::{class_name}"
 
-        # Execute the source code in an in-memory module
-        module_name = f"arc_agi_3.{self.environment_info.game_id}"
-        spec = importlib.util.spec_from_loader(module_name, loader=None)
-        if spec is None:
-            self.logger.error(f"Could not create module spec for {module_name}")
-            return
+        with _game_class_cache_lock:
+            cls = _game_class_cache.get(cache_key)
 
-        module = importlib.util.module_from_spec(spec)
-        try:
-            exec(source_code, module.__dict__)
-        except Exception as e:
-            self.logger.exception(
-                f"Error executing game source for {self.environment_info.game_id}: {e}"
-            )
-            return
+        loaded_from_cache = cls is not None
 
-        # Get the class from the module
-        cls: Any | None = getattr(module, class_name, None)
-        if cls is None or not isinstance(cls, type):
-            self.logger.error(f"Expected class `{class_name}` not found in {game_file}")
-            return
+        if cls is None:
+            try:
+                source_code = game_file.read_text(encoding="utf-8")
+            except Exception as e:
+                self.logger.exception(
+                    f"Failed to read game source from {game_file}: {e}"
+                )
+                return
 
-        if not issubclass(cls, ARCBaseGame):
-            self.logger.error(
-                f"Class `{class_name}` exists but is not a subclass of ARCBaseGame"
-            )
-            return
+            module_name = f"arc_agi_3.{self.environment_info.game_id}"
+            spec = importlib.util.spec_from_loader(module_name, loader=None)
+            if spec is None:
+                self.logger.error(f"Could not create module spec for {module_name}")
+                return
+
+            module = importlib.util.module_from_spec(spec)
+            try:
+                exec(source_code, module.__dict__)
+            except Exception as e:
+                self.logger.exception(
+                    f"Error executing game source for {self.environment_info.game_id}: {e}"
+                )
+                return
+
+            loaded: Any | None = getattr(module, class_name, None)
+            if loaded is None or not isinstance(loaded, type):
+                self.logger.error(
+                    f"Expected class `{class_name}` not found in {game_file}"
+                )
+                return
+
+            if not issubclass(loaded, ARCBaseGame):
+                self.logger.error(
+                    f"Class `{class_name}` exists but is not a subclass of ARCBaseGame"
+                )
+                return
+
+            with _game_class_cache_lock:
+                cls = _game_class_cache.get(cache_key)
+                if cls is None:
+                    _game_class_cache[cache_key] = loaded
+                    cls = loaded
+                # else: another thread populated the cache first; use cached class
+
+        self._game_class = cls
 
         sig = inspect.signature(cls)
         if seed is not None and "seed" in sig.parameters:
@@ -143,10 +166,17 @@ class LocalEnvironmentWrapper(EnvironmentWrapper):
         else:
             kwargs = {}
 
-        self._game = cls(**kwargs)
-        self.logger.info(
-            f"Successfully loaded game class {class_name} from {game_file}"
-        )
+        self._game = cls(**kwargs)  # type: ignore[arg-type]
+        if loaded_from_cache:
+            self.logger.debug(
+                "Instantiated %s from game class cache (%s)",
+                class_name,
+                cache_key,
+            )
+        else:
+            self.logger.info(
+                f"Successfully loaded game class {class_name} from {game_file}"
+            )
 
     def reset(self) -> Optional[FrameDataRaw]:
         """Reset the environment and return the initial frame data.

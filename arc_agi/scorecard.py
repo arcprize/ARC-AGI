@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, List, Optional, Tuple
@@ -9,9 +10,21 @@ from pydantic import BaseModel, Field, computed_field
 
 from .models import EnvironmentInfo
 
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
+
+if not logger.handlers:
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.INFO)
+    handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    logger.addHandler(handler)
+
+logger.setLevel(logging.INFO)
+logger.propagate = False
 
 DEFAULT_STALE_MINUTES = 15  # hard-coded fallback
+DEFAULT_MAX_OPEN_FOR_MINUTES = 4320  # hard-coded fallback - 3 days (72 hours)
+
+
 _MIN, _MAX = 1, 60  # sanity window (optional)
 
 
@@ -38,6 +51,36 @@ def _get_stale_minutes() -> int:
 
 
 STALE_MINUTES = _get_stale_minutes()
+
+
+def _max_open_for_minutes() -> int:
+    """Read MAX_OPEN_F1OR_MINUTES from the environment, fall back to default,
+    and clamp to a safe range.
+    """
+    raw = os.getenv("MAX_OPEN_FOR_MINUTES", str(DEFAULT_MAX_OPEN_FOR_MINUTES))
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning(
+            "MAX_OPEN_FOR_MINUTES=%r is not an int; using default=%d",
+            raw,
+            DEFAULT_MAX_OPEN_FOR_MINUTES,
+        )
+        value = DEFAULT_MAX_OPEN_FOR_MINUTES
+
+    if not _MAX <= value <= _MAX * 24 * 7:
+        logger.warning(
+            "MAX_OPEN_FOR_MINUTES=%d outside %d–%d; clamping",
+            value,
+            _MAX,
+            _MAX * 24 * 7,
+        )
+        value = max(_MAX, min(_MAX * 24 * 7, value))
+
+    return value
+
+
+MAX_OPEN_FOR_MINUTES = _max_open_for_minutes()
 
 
 class EnvironmentScore(BaseModel):
@@ -125,7 +168,7 @@ class EnvironmentScoreCalculator:
             # Calculate score as ((baseline_actions / actions_taken)^2 * 100) max 100
             if actions_taken > 0:
                 score = ((baseline_actions / actions_taken) ** 2) * 100
-                score = min(score, 100.0)  # Cap at 100
+                score = min(score, 115.0)  # Cap at 115
             else:
                 score = 0.0
             self.level_indices.append(level_index)
@@ -146,6 +189,7 @@ class EnvironmentScoreCalculator:
             EnvironmentScore with average of level_scores as the score.
         """
         # Calculate average of level_scores
+        max_weights = 0
         if len(self.level_scores) > 0:
             total_score = 0.0
             total_weights = 0
@@ -153,8 +197,13 @@ class EnvironmentScoreCalculator:
                 weight = self.level_indices[i]
                 total_score += self.level_scores[i] * weight
                 total_weights += weight
+                if self.level_scores[i] > 0:
+                    max_weights += weight
+
             # Calculate average of level_scores
             score = total_score / total_weights
+            max_score = max_weights / total_weights * 100
+            score = min(score, max_score)
         else:
             score = 0.0
 
@@ -820,23 +869,74 @@ class ScorecardManager:
     guids: dict[str, str]
     games: list[str]
     idle_for: timedelta
+    max_open_for: timedelta
 
-    def __init__(self, games: list[str] = []) -> None:
+    def __init__(
+        self,
+        games: list[str] = [],
+        recordings_dir: Optional[str] = None,
+    ) -> None:
         self.scorecards = {}
         self.guids = {}
         self.games = games
         self.idle_for = timedelta(minutes=STALE_MINUTES)
+        self.max_open_for = timedelta(minutes=MAX_OPEN_FOR_MINUTES)
+        self.recordings_dir = recordings_dir or os.getenv(
+            "RECORDINGS_DIR", "recordings"
+        )
+        logger.info(
+            f"Initialized ScorecardManager with idle_for={self.idle_for} and max_open_for={self.max_open_for}"
+        )
 
     def set_idle_for(self, idle_for: int) -> None:
         self.idle_for = timedelta(minutes=idle_for)
+        logger.info(f"Updated idle_for to {self.idle_for}")
+
+    def idle_duration_for(self, card_id: str) -> Optional[timedelta]:
+        """Return how long since last_update for this scorecard, or None if unknown."""
+        sc = self.scorecards.get(card_id)
+        if sc is None:
+            return None
+        return datetime.now(timezone.utc) - sc.last_update
+
+    def should_auto_close_scorecard(self, card_id: str) -> bool:
+        """True if this scorecard still matches auto-close rules (same logic as get_stale_cards)."""
+        sc = self.scorecards.get(card_id)
+        if sc is None:
+            return False
+        now = datetime.now(timezone.utc)
+        idle = now - sc.last_update
+        open_for = now - sc.open_at
+        return idle >= self.idle_for or open_for >= self.max_open_for
 
     def get_stale_cards(self) -> List[str]:
         now = datetime.now(timezone.utc)
-        stale_ids = [
-            cid
-            for cid, sc in self.scorecards.items()
-            if now - sc.last_update >= self.idle_for
-        ]
+        stale_ids: List[str] = []
+        for cid, sc in self.scorecards.items():
+            idle = now - sc.last_update
+            open_for = now - sc.open_at
+            if idle >= self.idle_for:
+                stale_ids.append(cid)
+                logger.info(
+                    "[get_stale_cards] stale scorecard card_id=%s idle=%s (%.1fs) "
+                    "threshold=%s (%.1fs)",
+                    cid,
+                    idle,
+                    idle.total_seconds(),
+                    self.idle_for,
+                    self.idle_for.total_seconds(),
+                )
+            elif open_for >= self.max_open_for:
+                stale_ids.append(cid)
+                logger.info(
+                    "[get_stale_cards] scorecard open too long card_id=%s open_for=%s (%.1fs) "
+                    "threshold=%s (%.1fs)",
+                    cid,
+                    open_for,
+                    open_for.total_seconds(),
+                    self.max_open_for,
+                    self.max_open_for.total_seconds(),
+                )
         return stale_ids
 
     def new_scorecard(

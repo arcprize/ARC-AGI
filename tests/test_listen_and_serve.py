@@ -606,6 +606,15 @@ class TestListenAndServe(unittest.TestCase):
                 "Full reset not have happend and thuse levels_completed should be 1",
             )
 
+            # a second level reset shouldn't reset the game either
+            comp_reset_frame = comp_env_1.reset()
+            self.assertIsNotNone(comp_reset_frame)
+            self.assertEqual(
+                comp_reset_frame.levels_completed,
+                1,
+                "Full reset not have happend and thuse levels_completed should be 1",
+            )
+
             # No full reset should happen and thus we should have 1 run
             comp_scorecard = client_arc_comp.close_scorecard(scorecard_id=comp_card_id)
             comp_env_score = comp_scorecard.find_environment("bt11")
@@ -613,8 +622,8 @@ class TestListenAndServe(unittest.TestCase):
             self.assertEqual(len(comp_env_score.runs), 1, "Should have 1 runs")
             self.assertEqual(
                 comp_env_score.runs[0].actions,
-                5,
-                "Should have 5 actions, even the failed reset counts as an action",
+                6,
+                "Should have 6 actions, even the failed reset counts as an action",
             )
 
         finally:
