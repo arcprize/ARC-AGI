@@ -293,7 +293,7 @@ class RestAPI:
             guid = data.get("guid")
             if action == GameAction.RESET:
                 if not guid:
-                    guid = str(uuid.uuid4())
+                    guid = game._guid
 
             if not guid:
                 return jsonify(
@@ -320,7 +320,7 @@ class RestAPI:
                         and g._game is not None
                     ):
                         scorecard = self.arcade.scorecard_manager.get_scorecard(
-                            data.get("card_id", None), api_key
+                            data.get("card_id", self.arcade.scorecard_manager.get_scorecard_from_guid(guid).card_id), api_key
                         )
                         # This is quite hacky as we have to look inside the underlying ARCBaseGame
                         # to check if this is the first action of the level and would cause a full reset,

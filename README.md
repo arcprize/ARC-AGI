@@ -120,6 +120,20 @@ You can render games in two ways:
    ```
 
 ## Changelog
+## [0.9.8] - 2026-04-17
+
+### Fix
+- Full Game Resets Happening when in Competition Mode
+
+## [0.9.7] - 2026-04-14
+
+### Updated
+- Scoring: Changed level cap from 100% to 115% and Game Cap to weighted average max for the number of levels completed
+
+### Fix
+- Memory Leak Associated With Dynamically Loading Python Game Code
+- Memory Leak Associated With GUID mismatch
+
 ## [0.9.6] - 2026-03-21
 
 ### Fix
