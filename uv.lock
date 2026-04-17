@@ -13,7 +13,7 @@ wheels = [
 
 [[package]]
 name = "arc-agi"
-version = "0.9.7rc1"
+version = "0.9.8"
 source = { editable = "." }
 dependencies = [
     { name = "arcengine" },
