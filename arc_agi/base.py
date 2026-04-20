@@ -61,7 +61,7 @@ class Arcade:
     def __init__(
         self,
         arc_api_key: str = "",
-        arc_base_url: str = "https://three.arcprize.org",
+        arc_base_url: str = "https://arcprize.org",
         operation_mode: OperationMode = OperationMode.NORMAL,
         environments_dir: str = "environment_files",
         recordings_dir: str = "recordings",
