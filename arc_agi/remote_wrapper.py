@@ -208,8 +208,10 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
             return None
 
         except requests.exceptions.RequestException as e:
+            response_text = e.response.text if e.response is not None else ""
+            response_body = f" Response body: {response_text}" if response_text else ""
             self.logger.error(
-                f"Failed to perform action {action.name} for game {self.environment_info.game_id}: {e}",
+                f"Failed to perform action {action.name} for game {self.environment_info.game_id}: {e}{response_body}",
                 exc_info=True,
             )
             return None
