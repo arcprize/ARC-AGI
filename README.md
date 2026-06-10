@@ -120,6 +120,11 @@ You can render games in two ways:
    ```
 
 ## Changelog
+## [0.9.9] - 2026-06-10
+
+### Updated
+- Remote action failures now include the HTTP response body in the error log to aid debugging
+
 ## [0.9.8] - 2026-04-17
 
 ### Fix
@@ -494,7 +499,7 @@ If you use this project in your research, please cite it as:
   title        = {ARC-AGI Toolkit},
   year         = {2026},
   url          = {https://github.com/arcprize/ARC-AGI},
-  version      = {0.9.1}
+  version      = {0.9.9}
 }
 ```
 
