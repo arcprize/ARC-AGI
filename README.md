@@ -120,6 +120,11 @@ You can render games in two ways:
    ```
 
 ## Changelog
+## [0.9.9] - 2026-06-10
+
+### Updated
+- Remote action failures now include the HTTP response body in the error log to aid debugging
+
 ## [0.9.8] - 2026-04-17
 
 ### Fix
