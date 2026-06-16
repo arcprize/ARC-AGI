@@ -47,7 +47,7 @@ class TestARCAGI3Defaults(unittest.TestCase):
         client = Arcade()
 
         self.assertEqual(client.arc_api_key, "test-key-123")
-        self.assertEqual(client.arc_base_url, "https://three.arcprize.org")
+        self.assertEqual(client.arc_base_url, "https://arcprize.org")
         self.assertEqual(client.operation_mode, OperationMode.NORMAL)
         self.assertEqual(client.environments_dir, "environment_files")
 
