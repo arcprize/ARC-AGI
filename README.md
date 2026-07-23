@@ -193,7 +193,7 @@ The `Arcade` constructor accepts the following parameters. All parameters can be
 | Parameter | Type | Default | Environment Variable | Description |
 |-----------|------|---------|---------------------|-------------|
 | `arc_api_key` | `str` | `""` | `ARC_API_KEY` | API key for ARC API. If empty and not in offline mode, an anonymous key will be automatically fetched. |
-| `arc_base_url` | `str` | `"https://three.arcprize.org"` | `ARC_BASE_URL` | Base URL for the ARC API. |
+| `arc_base_url` | `str` | `"https://arcprize.org"` | `ARC_BASE_URL` | Base URL for the ARC API. |
 | `operation_mode` | `OperationMode` | `OperationMode.NORMAL` | `OPERATION_MODE` | `NORMAL` (local + API), `ONLINE` (API only), `OFFLINE` (local only), or `COMPETITON` (API only + [compeition scoring](#competition-mode)). |
 | `environments_dir` | `str` | `"environment_files"` | `ENVIRONMENTS_DIR` | Directory to scan for local `metadata.json` files. |
 | `recordings_dir` | `str` | `"recordings"` | `RECORDINGS_DIR` | Directory to save game recordings (JSONL format). |
