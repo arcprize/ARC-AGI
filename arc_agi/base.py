@@ -26,13 +26,13 @@ from .wrapper import EnvironmentWrapper
 # Handle missing files and permission errors gracefully
 try:
     load_dotenv(dotenv_path=".env")
-except (OSError, PermissionError, FileNotFoundError):
+except (OSError, PermissionError, FileNotFoundError, UnicodeDecodeError):
     pass
 
 
 try:
     load_dotenv(dotenv_path=".env.example")
-except (OSError, PermissionError, FileNotFoundError):
+except (OSError, PermissionError, FileNotFoundError, UnicodeDecodeError):
     pass
 
 
