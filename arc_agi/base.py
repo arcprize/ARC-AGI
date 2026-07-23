@@ -26,13 +26,13 @@ from .wrapper import EnvironmentWrapper
 # Handle missing files and permission errors gracefully
 try:
     load_dotenv(dotenv_path=".env")
-except (OSError, PermissionError, FileNotFoundError):
+except (OSError, PermissionError, FileNotFoundError, UnicodeDecodeError):
     pass
 
 
 try:
     load_dotenv(dotenv_path=".env.example")
-except (OSError, PermissionError, FileNotFoundError):
+except (OSError, PermissionError, FileNotFoundError, UnicodeDecodeError):
     pass
 
 
@@ -61,7 +61,7 @@ class Arcade:
     def __init__(
         self,
         arc_api_key: str = "",
-        arc_base_url: str = "https://three.arcprize.org",
+        arc_base_url: str = "https://arcprize.org",
         operation_mode: OperationMode = OperationMode.NORMAL,
         environments_dir: str = "environment_files",
         recordings_dir: str = "recordings",
@@ -92,7 +92,7 @@ class Arcade:
             self.arc_api_key = os.getenv("ARC_API_KEY", "")
 
         # arc_base_url: constructor arg > env var > default URL
-        default_base_url = "https://three.arcprize.org"
+        default_base_url = "https://arcprize.org"
         if arc_base_url != default_base_url:
             self.arc_base_url = arc_base_url
         else:
