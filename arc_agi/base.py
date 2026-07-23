@@ -92,7 +92,7 @@ class Arcade:
             self.arc_api_key = os.getenv("ARC_API_KEY", "")
 
         # arc_base_url: constructor arg > env var > default URL
-        default_base_url = "https://three.arcprize.org"
+        default_base_url = "https://arcprize.org"
         if arc_base_url != default_base_url:
             self.arc_base_url = arc_base_url
         else:
