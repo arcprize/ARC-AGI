@@ -39,7 +39,7 @@ class RemoteEnvironmentWrapper(EnvironmentWrapper):
         """Initialize the remote environment wrapper.
 
         Args:
-            base_url: Base URL for the ARC-AGI-3 API (e.g., "https://three.arcprize.org").
+            base_url: Base URL for the ARC-AGI-3 API (e.g., "https://arcprize.org").
             environment_info: EnvironmentInfo object with game metadata.
             arc_api_key: API key for authentication.
             logger: Logger instance for logging.
