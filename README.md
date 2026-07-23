@@ -13,7 +13,7 @@ ARC-AGI Toolkit is an open-sourced python interface (API) for ARC-AGI-3 interact
    pip install arc-agi
    ```
 
-2. **API Key**: You can optionally set the `ARC_API_KEY` environment variable with your API key. If no key is provided, an anonymous key will be used. However, registering for an API key will give you access to more games at release. [Register for an API key at https://three.arcprize.org](https://three.arcprize.org)
+2. **API Key**: You can optionally set the `ARC_API_KEY` environment variable with your API key. If no key is provided, an anonymous key will be used. However, registering for an API key will give you access to more games at release. [Register for an API key at https://arcprize.org](https://arcprize.org)
    
    The code supports loading from `.env` and `.env.example` files (using python-dotenv), or you can set it directly:
    ```bash
