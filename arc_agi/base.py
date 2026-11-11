@@ -61,7 +61,7 @@ class Arcade:
     def __init__(
         self,
         arc_api_key: str = "",
-        arc_base_url: str = "https://three.arcprize.org",
+        arc_base_url: str = "https://arcprize.org",
         operation_mode: OperationMode = OperationMode.NORMAL,
         environments_dir: str = "environment_files",
         recordings_dir: str = "recordings",
@@ -72,7 +72,7 @@ class Arcade:
         Args:
             arc_api_key: API key for ARC API. Defaults to empty string.
                 Can be overridden by ARC_API_KEY environment variable.
-            arc_base_url: Base URL for ARC API. Defaults to "https://three.arcprize.org".
+            arc_base_url: Base URL for ARC API. Defaults to "https://arcprize.org".
                 Can be overridden by ARC_BASE_URL environment variable.
             operation_mode: NORMAL (local + API), ONLINE (API only), or OFFLINE (local only).
                 Defaults to NORMAL. Can be overridden by OPERATION_MODE env var
@@ -92,7 +92,7 @@ class Arcade:
             self.arc_api_key = os.getenv("ARC_API_KEY", "")
 
         # arc_base_url: constructor arg > env var > default URL
-        default_base_url = "https://three.arcprize.org"
+        default_base_url = "https://arcprize.org"
         if arc_base_url != default_base_url:
             self.arc_base_url = arc_base_url
         else:
