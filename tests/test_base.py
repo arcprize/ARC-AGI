@@ -410,7 +410,7 @@ class TestARCAGI3EnvironmentsDirScanning(unittest.TestCase):
             # Check that the expected environments are found
             environment_ids = {env.game_id for env in client.available_environments}
             self.assertIn("bt11-fd9df0622a1a", environment_ids)
-            self.assertIn("tg62-12345678", environment_ids)
+            self.assertIn("bt33-a7c3f9d18b4e", environment_ids)
 
 
 class TestARCAGI3APIFetching(unittest.TestCase):
@@ -461,7 +461,9 @@ class TestARCAGI3APIFetching(unittest.TestCase):
         mock_get.assert_called_once()
         call_args = mock_get.call_args
         self.assertEqual(call_args[0][0], "https://arcprize.org/api/games")
-        self.assertEqual(call_args[1]["headers"]["X-API-Key"], "test-api-key")
+        # HTTP header names are case-insensitive, so compare them case-insensitively
+        headers = {k.lower(): v for k, v in call_args[1]["headers"].items()}
+        self.assertEqual(headers["x-api-key"], "test-api-key")
 
         # Verify environment was added
         self.assertEqual(len(client.available_environments), 1)
@@ -566,15 +568,26 @@ class TestARCAGI3APIFetching(unittest.TestCase):
 
     @patch("arc_agi.base.requests.get")
     def test_api_no_key_skips_fetch(self, mock_get):
-        """Test that API is not called when no API key is provided."""
-        _ = Arcade(
+        """Test that the games API is not called when no API key can be obtained.
+
+        With no key from the constructor or ARC_API_KEY, Arcade requests an
+        anonymous key; if that returns no key, fetching games is skipped.
+        """
+        os.environ.pop("ARC_API_KEY", None)
+        mock_get.return_value.json.return_value = {}  # anonkey response without "api_key"
+
+        client = Arcade(
             arc_api_key="",  # Empty API key
             operation_mode=OperationMode.NORMAL,
             environments_dir=None,
         )
 
-        # Verify API was not called
-        mock_get.assert_not_called()
+        # Only the anonymous key endpoint was called; games were not fetched
+        mock_get.assert_called_once()
+        self.assertEqual(
+            mock_get.call_args[0][0], "https://arcprize.org/api/games/anonkey"
+        )
+        self.assertEqual(client.arc_api_key, "")
 
     @patch("arc_agi.base.requests.get")
     def test_api_error_handled_gracefully(self, mock_get):
