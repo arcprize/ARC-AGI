@@ -5,7 +5,7 @@ import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 _mock_dotenv = MagicMock()
 _mock_dotenv.load_dotenv = MagicMock()
@@ -282,6 +282,53 @@ class TestLocalEnvironmentWrapper(unittest.TestCase):
         action_space = wrapper.action_space
         self.assertGreater(len(action_space), 0, "Action space should have actions")
         self.assertIn(GameAction.ACTION6, action_space, "ACTION6 should be available")
+
+    def test_action6_invalid_coordinates_do_not_advance_game(self) -> None:
+        """Reject invalid clicks before changing observations or action counts."""
+        client = Arcade(
+            operation_mode=OperationMode.OFFLINE,
+            environments_dir=self.environments_dir,
+            logger=self.logger,
+        )
+        card_id = client.create_scorecard()
+        wrapper = client.make("bt33-a7c3f9d18b4e", scorecard_id=card_id)
+        self.assertIsNotNone(wrapper)
+        observation = wrapper.observation_space
+        action_count = wrapper._game._action_count
+        steps = wrapper._steps
+        scorecard_actions = client.get_scorecard(card_id).total_actions
+
+        for x, y in [(-10, 10), (-1, 10), (64, 10), (10, -1), (10, 64)]:
+            with self.subTest(x=x, y=y):
+                with patch.object(self.logger, "exception"):
+                    frame = wrapper.step(GameAction.ACTION6, data={"x": x, "y": y})
+                self.assertIsNone(frame)
+                self.assertIs(wrapper.observation_space, observation)
+                self.assertEqual(wrapper._game._action_count, action_count)
+                self.assertEqual(wrapper._steps, steps)
+                self.assertEqual(
+                    client.get_scorecard(card_id).total_actions, scorecard_actions
+                )
+
+    def test_action6_boundary_coordinates_are_accepted(self) -> None:
+        """Keep all four corners of the 64x64 frame valid."""
+        client = Arcade(
+            operation_mode=OperationMode.OFFLINE,
+            environments_dir=self.environments_dir,
+            logger=self.logger,
+        )
+        card_id = client.create_scorecard()
+        wrapper = client.make("bt33-a7c3f9d18b4e", scorecard_id=card_id)
+        self.assertIsNotNone(wrapper)
+
+        for x, y in [(0, 0), (0, 63), (63, 0), (63, 63)]:
+            with self.subTest(x=x, y=y):
+                wrapper.reset()
+                action_count = wrapper._game._action_count
+                frame = wrapper.step(GameAction.ACTION6, data={"x": x, "y": y})
+                self.assertIsNotNone(frame)
+                self.assertEqual(frame.action_input.data, {"x": x, "y": y})
+                self.assertEqual(wrapper._game._action_count, action_count + 1)
 
 
 if __name__ == "__main__":

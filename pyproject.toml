@@ -17,9 +17,9 @@ dependencies = [
     "flask>=3.1.0",
     "matplotlib>=3.7.0",
     "pydantic>=2.0.0",
-    "python-dotenv>=1.0.0",
-    "pillow>=12.1.1",
-    "requests>=2.31.0",
+    "python-dotenv>=1.2.2",
+    "pillow>=13.0.0",
+    "requests>=2.33.0",
 ]
 
 [dependency-groups]

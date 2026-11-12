@@ -120,6 +120,15 @@ You can render games in two ways:
    ```
 
 ## Changelog
+## [0.9.10] - 2026-11-12
+
+### Updated
+- Update default arcprize url to https://arcprize.org
+- Update dependencies
+
+### Fix
+- Validation for actions when running locally to match competition mode
+
 ## [0.9.9] - 2026-06-10
 
 ### Updated
