@@ -231,8 +231,10 @@ class LocalEnvironmentWrapper(EnvironmentWrapper):
         try:
             from arcengine import ActionInput
 
-            # Create ActionInput from GameAction with data
-            action_input = ActionInput(id=action, data=data or {}, reasoning=reasoning)
+            # Match API validation before the engine can consume an action.
+            action_data = data or {}
+            action.validate_data(action_data)
+            action_input = ActionInput(id=action, data=action_data, reasoning=reasoning)
 
             # Perform the action
             frame_data = cast(
