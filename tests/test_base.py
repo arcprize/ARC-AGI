@@ -42,12 +42,15 @@ class TestARCAGI3Defaults(unittest.TestCase):
             os.environ.pop(var, None)
         os.environ["ARC_API_KEY"] = "test-key-123"
 
-    def test_default_initialization(self):
+    @patch("arc_agi.base.requests.get")
+    def test_default_initialization(self, mock_get):
         """Test that default values are used when no parameters are provided."""
+        mock_get.return_value.json.return_value = []
         client = Arcade()
 
+        self.assertEqual(mock_get.call_args[0][0], "https://arcprize.org/api/games")
         self.assertEqual(client.arc_api_key, "test-key-123")
-        self.assertEqual(client.arc_base_url, "https://three.arcprize.org")
+        self.assertEqual(client.arc_base_url, "https://arcprize.org")
         self.assertEqual(client.operation_mode, OperationMode.NORMAL)
         self.assertEqual(client.environments_dir, "environment_files")
 
@@ -119,6 +122,17 @@ class TestARCAGI3EnvironmentVariables(unittest.TestCase):
         )
 
         self.assertEqual(client.arc_api_key, "constructor-key")
+
+    @patch("arc_agi.base.requests.get")
+    def test_arc_base_url_from_env_without_constructor_override(self, mock_get):
+        """Use ARC_BASE_URL when the constructor URL is omitted."""
+        os.environ["ARC_BASE_URL"] = "https://env.example.com"
+        mock_get.return_value.json.return_value = []
+
+        client = Arcade()
+
+        self.assertEqual(client.arc_base_url, "https://env.example.com")
+        self.assertEqual(mock_get.call_args[0][0], "https://env.example.com/api/games")
 
     def test_arc_base_url_from_env(self):
         """Test that constructor argument overrides environment variable."""
@@ -446,7 +460,7 @@ class TestARCAGI3APIFetching(unittest.TestCase):
         # Verify API was called
         mock_get.assert_called_once()
         call_args = mock_get.call_args
-        self.assertEqual(call_args[0][0], "https://three.arcprize.org/api/games")
+        self.assertEqual(call_args[0][0], "https://arcprize.org/api/games")
         self.assertEqual(call_args[1]["headers"]["X-API-Key"], "test-api-key")
 
         # Verify environment was added
