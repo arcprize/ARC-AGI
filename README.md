@@ -124,6 +124,7 @@ You can render games in two ways:
 
 ### Updated
 - Update default arcprize url to https://arcprize.org
+- Update dependencies
 
 ### Fix
 - Validation for actions when running locally to match competition mode
